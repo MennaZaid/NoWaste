@@ -18,10 +18,22 @@
     "title": "مرحبًا بك في NoWaste",
     "message": "اعثر على الطعام الفائض القريب منك بسعر أقل، وساعد في إنقاذ الطعام الجيد من الهدر.",
     "register": "إنشاء حساب",
-    "registerHint": "إنشاء حساب مستهلك جديد",
+    "registerHint": "إنشاء حساب جديد للدور المختار",
     "login": "تسجيل الدخول",
     "loginHint": "تسجيل الدخول غير متاح بعد",
-    "loginComingSoon": "سيتوفر تسجيل الدخول قريبًا."
+    "loginComingSoon": "سيتوفر تسجيل الدخول قريبًا.",
+    "roleLabel": "أنا",
+    "roles": {
+      "consumer": "مستهلك",
+      "consumerDescription": "ابحث عن الطعام الفائض بالقرب منك واحجزه",
+      "vendor": "بائع",
+      "vendorDescription": "محل أو مطعم أو مخبز أو كشك لديه طعام فائض",
+      "partner": "شريك",
+      "partnerDescription": "جمعية خيرية أو جهة تسميد",
+      "admin": "مسؤول",
+      "adminDescription": "عضو في فريق NoWaste يراجع الطلبات"
+    },
+    "adminNote": "ينشئ فريق NoWaste حسابات المسؤولين. لا يمكن إنشاء حساب مسؤول من التطبيق."
   },
   "register": {
     "title": "إنشاء حساب",
@@ -46,7 +58,12 @@
     "ruleMet": "متحقق",
     "ruleNotMet": "غير متحقق",
     "submit": "إنشاء الحساب",
-    "submitting": "جارٍ إنشاء حسابك…"
+    "submitting": "جارٍ إنشاء حسابك…",
+    "introVendor": "أخبرنا عن محلك. يراجع أحد المسؤولين كل طلب بائع قبل أن تتمكن من نشر الطعام.",
+    "introPartner": "أخبرنا عن جهتك. يراجع أحد المسؤولين كل طلب شريك قبل أن تتمكن من استلام الطعام.",
+    "submitApplication": "إرسال الطلب",
+    "submittingApplication": "جارٍ إرسال طلبك…",
+    "accountSection": "بيانات تسجيل الدخول"
   },
   "errors": {
     "fixFields": "يُرجى تصحيح الحقول المحددة.",
@@ -57,7 +74,24 @@
     "passwordInvalid": "كلمة المرور لا تستوفي الشروط أدناه.",
     "languageInvalid": "اختر العربية أو الإنجليزية.",
     "unreachable": "تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى.",
-    "unexpected": "حدث خطأ ما. يُرجى المحاولة مرة أخرى."
+    "unexpected": "حدث خطأ ما. يُرجى المحاولة مرة أخرى.",
+    "shopNameRequired": "أدخل اسم المحل.",
+    "vendorTypeInvalid": "اختر رسمي أو غير رسمي.",
+    "contactRequired": "أدخل رقم تواصل للمحل.",
+    "organisationRequired": "أدخل اسم الجهة.",
+    "addressRequired": "اكتب العنوان.",
+    "pinRequired": "ضع الدبوس على الخريطة.",
+    "foodTypesRequired": "اختر نوع طعام واحدًا على الأقل.",
+    "contactInvalid": "أدخل رقم محمول أو أرضي مصري، مثل 01012345678 أو 0223456789.",
+    "shopNameTooLong": "يجب ألا يزيد اسم المحل عن {{max}} حرفًا.",
+    "organisationTooLong": "يجب ألا يزيد اسم الجهة عن {{max}} حرفًا.",
+    "addressTooLong": "يجب ألا يزيد العنوان عن {{max}} حرفًا.",
+    "descriptionTooLong": "يجب ألا يزيد الوصف عن {{max}} حرفًا.",
+    "partnerTypeRequired": "اختر شريك خيري أو شريك تسميد أو شريك آخر.",
+    "otherPartnerTypeRequired": "اكتب نوع الشريك لديكم.",
+    "otherPartnerTypeTooLong": "يجب ألا يزيد نوع الشريك عن {{max}} حرفًا.",
+    "otherFoodTypeRequired": "اكتب نوع الطعام الآخر الذي تقبلونه.",
+    "otherFoodTypeTooLong": "يجب ألا يزيد نوع الطعام الآخر عن {{max}} حرفًا."
   },
   "duplicate": {
     "emailTitle": "هذا البريد الإلكتروني مسجّل بالفعل",
@@ -72,6 +106,68 @@
     "successLabel": "تم بنجاح",
     "message": "حسابك كمستهلك في NoWaste جاهز.",
     "next": "سيتوفر تسجيل الدخول قريبًا، وبعدها يمكنك البحث عن الطعام القريب منك.",
+    "backToStart": "العودة إلى البداية"
+  },
+  "accountTypes": {
+    "charity": "شريك خيري",
+    "charityDescription": "جمعية خيرية تستلم الطعام المتبرع به",
+    "composting": "شريك تسميد",
+    "compostingDescription": "جهة تحوّل الطعام غير الصالح للبشر إلى سماد",
+    "other": "شريك آخر",
+    "otherDescription": "جهة من نوع آخر تستلم الطعام"
+  },
+  "vendor": {
+    "shopNameLabel": "اسم المحل",
+    "shopNamePlaceholder": "مثال: مخبز فاطمة",
+    "typeLabel": "نوع النشاط",
+    "typeFormal": "رسمي",
+    "typeInformal": "غير رسمي",
+    "typeHint": "رسمي: نشاط مسجل مثل مطعم أو بقالة. غير رسمي: كشك أو مخبز صغير غير مسجل رسميًا.",
+    "contactLabel": "رقم التواصل",
+    "contactPlaceholder": "01XXXXXXXXX أو 02XXXXXXXX",
+    "contactHint": "رقم محمول أو أرضي مصري، مثل 01012345678 أو 0223456789",
+    "descriptionLabel": "وصف المحل (اختياري)",
+    "descriptionPlaceholder": "مثال: خبز طازج يُخبز يوميًا",
+    "descriptionCount": "{{count}} / {{max}}"
+  },
+  "partner": {
+    "organisationLabel": "اسم الجهة",
+    "organisationPlaceholder": "مثال: بنك الطعام بالجيزة",
+    "foodTypesLabel": "أنواع الطعام التي تقبلونها",
+    "typeLabel": "نوع الشريك",
+    "otherTypeLabel": "نوع الشريك لديكم",
+    "otherTypePlaceholder": "مثال: لجنة الطعام بالمسجد",
+    "otherFoodTypeLabel": "نوع طعام آخر",
+    "otherFoodTypePlaceholder": "مثال: علف حيوانات"
+  },
+  "foodCategories": {
+    "bread_and_baked_goods": "خبز ومخبوزات",
+    "cooked_meals": "وجبات مطبوخة",
+    "fruit_and_vegetables": "فواكه وخضروات",
+    "dairy_and_eggs": "ألبان وبيض",
+    "meat_poultry_and_fish": "لحوم ودواجن وأسماك",
+    "packaged_and_dry_food": "أطعمة معلبة وجافة",
+    "other": "أخرى"
+  },
+  "location": {
+    "title": "الموقع",
+    "instructions": "اسحب الدبوس إلى المكان الدقيق لاستلام الطعام، ثم اكتب العنوان.",
+    "permissionDenied": "يحتاج NoWaste إلى موقعك لوضع الدبوس. يمكنك وضعه يدويًا: اضغط على الخريطة ثم اسحب الدبوس إلى المكان الدقيق.",
+    "mapLabel": "الخريطة: اسحب الدبوس إلى الموقع الدقيق",
+    "noPin": "لم يتم وضع الدبوس بعد",
+    "pinAt": "الدبوس: {{latitude}}، {{longitude}}",
+    "addressLabel": "العنوان المكتوب",
+    "addressPlaceholder": "الشارع والمبنى والمنطقة",
+    "addressFromPin": "تمت كتابة العنوان من موقع الدبوس. راجعه وصححه إذا لزم الأمر.",
+    "addressNotFound": "لم نتمكن من العثور على هذا العنوان على الخريطة. ضع الدبوس يدويًا: اضغط على الخريطة ثم اسحب الدبوس إلى المكان الدقيق.",
+    "detect": "استخدم موقعي الحالي",
+    "detecting": "جارٍ تحديد موقعك…",
+    "detectHint": "يعيد الدبوس إلى مكان هاتفك الآن"
+  },
+  "applied": {
+    "title": "تم إرسال الطلب",
+    "message": "طلبك قيد المراجعة إلى أن يراجعه أحد المسؤولين.",
+    "next": "سيتوفر تسجيل الدخول قريبًا، وستتمكن عندها من متابعة حالة طلبك.",
     "backToStart": "العودة إلى البداية"
   }
 }

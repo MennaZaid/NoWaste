@@ -1,5 +1,12 @@
 // Client for the SDD IApi (REST, SDD 3.2.3). The base URL comes from app/.env (EXPO_PUBLIC_API_URL).
-import type { Language, RegistrationField } from '@nowaste/shared';
+import type {
+  Language,
+  PartnerProfile,
+  PartnerRole,
+  RegistrationField,
+  SignUpField,
+  VendorProfile,
+} from '@nowaste/shared';
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -58,6 +65,41 @@ export type RegisterResult =
 
 /** POST /auth/register (US-01). */
 export async function registerConsumer(body: RegisterRequest): Promise<RegisterResult> {
+  const result = await postRegister(body);
+  if (result.kind === 'created') return { kind: 'created', id: result.id };
+  if (result.kind === 'invalid') return { kind: 'invalid', fields: result.fields as RegistrationField[] };
+  return result;
+}
+
+export type ApplicationRequest = RegisterRequest &
+  ({ role: 'vendor'; vendorProfile: VendorProfile } | { role: PartnerRole; partnerProfile: PartnerProfile });
+
+export type ApplicationResult =
+  | { kind: 'created'; id: string; status: 'Pending' }
+  | { kind: 'invalid'; fields: SignUpField[] } // E-ACC-02
+  | { kind: 'duplicate'; field: 'email' | 'phone' } // E-ACC-01
+  | { kind: 'unreachable' }
+  | { kind: 'unexpected' };
+
+/** POST /auth/register with role vendor (US-02) or charity / composting (US-03). */
+export async function submitApplication(body: ApplicationRequest): Promise<ApplicationResult> {
+  const result = await postRegister(body);
+  if (result.kind === 'created') {
+    return result.status === 'Pending'
+      ? { kind: 'created', id: result.id, status: 'Pending' }
+      : { kind: 'unexpected' };
+  }
+  return result;
+}
+
+type PostRegisterResult =
+  | { kind: 'created'; id: string; status: unknown }
+  | { kind: 'invalid'; fields: SignUpField[] }
+  | { kind: 'duplicate'; field: 'email' | 'phone' }
+  | { kind: 'unreachable' }
+  | { kind: 'unexpected' };
+
+async function postRegister(body: object): Promise<PostRegisterResult> {
   let response: Response;
   try {
     response = await request('/auth/register', {
@@ -72,10 +114,10 @@ export async function registerConsumer(body: RegisterRequest): Promise<RegisterR
   try {
     const data = (await response.json()) as Record<string, unknown>;
     if (response.status === 201 && typeof data.id === 'string') {
-      return { kind: 'created', id: data.id };
+      return { kind: 'created', id: data.id, status: data.status };
     }
     if (response.status === 400 && data.error === 'E-ACC-02' && Array.isArray(data.fields)) {
-      return { kind: 'invalid', fields: data.fields as RegistrationField[] };
+      return { kind: 'invalid', fields: data.fields as SignUpField[] };
     }
     if (
       response.status === 409 &&

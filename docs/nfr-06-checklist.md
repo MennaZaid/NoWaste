@@ -26,6 +26,25 @@ Tested on Android only; iOS is Not Tested (N-10).
 | Account created (success)                              | ✓ (N-1)                | ✓ (N-1)                | ✓ (N-1)                                          |
 | Header language switch on Register and Account created | ✓ (N-1; Register: M-2) | ✓ (N-1; Register: M-2) | ✓ (N-1)                                          |
 
+### Turn 2 screens (US-02, US-03), added 2026-10-26
+
+Not Tested yet. Record each result in docs/test-execution.md with the date, tester and phone, then fill in the cell.
+
+| Screen                                                                                       | English OK | Arabic RTL OK | No clipped text |
+| -------------------------------------------------------------------------------------------- | ---------- | ------------- | --------------- |
+| Welcome, role selection (Consumer, Vendor, Partner, Administrator), then Register and Log in | Not Tested | Not Tested    | Not Tested      |
+| Welcome, Administrator chosen: admin note and Log in only                                    | Not Tested | Not Tested    | Not Tested      |
+| Register, Partner: Charity partner / Composting partner choice                               | Not Tested | Not Tested    | Not Tested      |
+| Register, Vendor: shop name, Formal / Informal, contact, description                         | Not Tested | Not Tested    | Not Tested      |
+| Register, Vendor or partner: location step with map, pin line, address                       | Not Tested | Not Tested    | Not Tested      |
+| Register, location permission denied notice                                                  | Not Tested | Not Tested    | Not Tested      |
+| Register, Charity or Composting: organisation name and six food types                        | Not Tested | Not Tested    | Not Tested      |
+| Register, application with invalid fields marked (E-ACC-02)                                  | Not Tested | Not Tested    | Not Tested      |
+| Application sent (Pending)                                                                   | Not Tested | Not Tested    | Not Tested      |
+
+For the Turn 2 rows, "Arabic RTL OK" also means: the radio and check marks sit on the right of each option, the
+pin line and the address field read right-to-left, and the map itself is not mirrored (north stays up).
+
 Notes on the evidence:
 
 - N-1 (2026-10-24): Welcome, Register and Account created were checked in English and Arabic. No visible clipping

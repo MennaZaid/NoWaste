@@ -164,6 +164,9 @@ describe('NFR-07a accessibility labels', () => {
       });
       expectEveryControlLabelled(0);
 
+      // D-30: choose the consumer role (the first option) before Register appears.
+      await fireEvent.press(screen.getAllByRole('radio')[0]!);
+      expectEveryControlLabelled(0);
       await fireEvent.press(screen.getByTestId('welcome-register'));
       await screen.findAllByTestId('register-submit');
       expectEveryControlLabelled(2);
@@ -237,7 +240,9 @@ describe('Register screen details', () => {
 describe('Welcome and Account created screens', () => {
   test('D-20 Log in on the Welcome screen explains that log in is coming soon', async () => {
     await renderApp('/');
-    await fireEvent.press(await screen.findByTestId('welcome-login'));
+    // D-30: a role is chosen first; Log in then appears.
+    await fireEvent.press(await screen.findByRole('radio', { name: 'Consumer' }));
+    await fireEvent.press(screen.getByTestId('welcome-login'));
 
     expect(await screen.findByText('Log in will be available soon.')).toBeOnTheScreen();
   });
@@ -245,7 +250,8 @@ describe('Welcome and Account created screens', () => {
   test('FR-ACC-01 Back to start on the success screen returns to the Welcome screen', async () => {
     mockedRegister.mockResolvedValue({ kind: 'created', id: 'u3' });
     const app = await renderApp('/');
-    await fireEvent.press(await screen.findByTestId('welcome-register'));
+    await fireEvent.press(await screen.findByRole('radio', { name: 'Consumer' }));
+    await fireEvent.press(screen.getByTestId('welcome-register'));
     await fireEvent.changeText(await screen.findByLabelText('Email address'), 'mona@example.com');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'abcd1234');
     await submit();

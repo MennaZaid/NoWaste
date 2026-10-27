@@ -38,6 +38,10 @@ function Navigator() {
             name="registered"
             options={{ title: t('registered.title'), headerBackVisible: false, gestureEnabled: false }}
           />
+          <Stack.Screen
+            name="applied"
+            options={{ title: t('applied.title'), headerBackVisible: false, gestureEnabled: false }}
+          />
         </Stack>
         <StatusBar style="dark" />
       </View>

@@ -18,10 +18,22 @@
     "title": "Welcome to NoWaste",
     "message": "Find surplus food near you at a lower price, and help keep good food from going to waste.",
     "register": "Register",
-    "registerHint": "Create a new consumer account",
+    "registerHint": "Create a new account for the chosen role",
     "login": "Log in",
     "loginHint": "Log in is not available yet",
-    "loginComingSoon": "Log in will be available soon."
+    "loginComingSoon": "Log in will be available soon.",
+    "roleLabel": "I am a",
+    "roles": {
+      "consumer": "Consumer",
+      "consumerDescription": "Find and reserve surplus food near you",
+      "vendor": "Vendor",
+      "vendorDescription": "A shop, restaurant, bakery or street stall with surplus food",
+      "partner": "Partner",
+      "partnerDescription": "A charity or composting organisation",
+      "admin": "Administrator",
+      "adminDescription": "A member of the NoWaste team who reviews applications"
+    },
+    "adminNote": "Administrator accounts are created by the NoWaste team. You cannot register one in the app."
   },
   "register": {
     "title": "Create account",
@@ -46,7 +58,12 @@
     "ruleMet": "met",
     "ruleNotMet": "not met",
     "submit": "Create account",
-    "submitting": "Creating your account…"
+    "submitting": "Creating your account…",
+    "introVendor": "Tell us about your shop. An administrator reviews every vendor application before you can post food.",
+    "introPartner": "Tell us about your organisation. An administrator reviews every partner application before you can receive food.",
+    "submitApplication": "Send application",
+    "submittingApplication": "Sending your application…",
+    "accountSection": "Your login details"
   },
   "errors": {
     "fixFields": "Please correct the highlighted fields.",
@@ -57,7 +74,24 @@
     "passwordInvalid": "The password does not meet the rules below.",
     "languageInvalid": "Choose English or Arabic.",
     "unreachable": "We could not reach the server. Check your connection and try again.",
-    "unexpected": "Something went wrong. Please try again."
+    "unexpected": "Something went wrong. Please try again.",
+    "shopNameRequired": "Enter the shop name.",
+    "vendorTypeInvalid": "Choose Formal or Informal.",
+    "contactRequired": "Enter a contact number for the shop.",
+    "organisationRequired": "Enter the organisation name.",
+    "addressRequired": "Type the written address.",
+    "pinRequired": "Place the pin on the map.",
+    "foodTypesRequired": "Choose at least one food type.",
+    "contactInvalid": "Enter an Egyptian mobile or landline number, for example 01012345678 or 0223456789.",
+    "shopNameTooLong": "Keep the shop name to {{max}} characters or fewer.",
+    "organisationTooLong": "Keep the organisation name to {{max}} characters or fewer.",
+    "addressTooLong": "Keep the address to {{max}} characters or fewer.",
+    "descriptionTooLong": "Keep the description to {{max}} characters or fewer.",
+    "partnerTypeRequired": "Choose Charity partner, Composting partner or Other partner.",
+    "otherPartnerTypeRequired": "Write what type of partner you are.",
+    "otherPartnerTypeTooLong": "Keep the type of partner to {{max}} characters or fewer.",
+    "otherFoodTypeRequired": "Write the other food type you accept.",
+    "otherFoodTypeTooLong": "Keep the other food type to {{max}} characters or fewer."
   },
   "duplicate": {
     "emailTitle": "This email is already registered",
@@ -72,6 +106,68 @@
     "successLabel": "Success",
     "message": "Your NoWaste consumer account is ready.",
     "next": "Log in will be available soon. You can then start finding food near you.",
+    "backToStart": "Back to start"
+  },
+  "accountTypes": {
+    "charity": "Charity partner",
+    "charityDescription": "A charity that collects donated food",
+    "composting": "Composting partner",
+    "compostingDescription": "An organisation that composts food unfit for people",
+    "other": "Other partner",
+    "otherDescription": "Another kind of organisation that receives food"
+  },
+  "vendor": {
+    "shopNameLabel": "Shop name",
+    "shopNamePlaceholder": "For example: Fatma Bakery",
+    "typeLabel": "Type of business",
+    "typeFormal": "Formal",
+    "typeInformal": "Informal",
+    "typeHint": "Formal: a registered business such as a restaurant or grocery. Informal: a street stall or small bakery that is not formally registered.",
+    "contactLabel": "Contact number",
+    "contactPlaceholder": "01XXXXXXXXX or 02XXXXXXXX",
+    "contactHint": "An Egyptian mobile or landline number, for example 01012345678 or 0223456789",
+    "descriptionLabel": "Shop description (optional)",
+    "descriptionPlaceholder": "For example: Fresh bread baked daily",
+    "descriptionCount": "{{count}} / {{max}}"
+  },
+  "partner": {
+    "organisationLabel": "Organisation name",
+    "organisationPlaceholder": "For example: Giza Food Bank",
+    "foodTypesLabel": "Food types you accept",
+    "typeLabel": "Type of partner",
+    "otherTypeLabel": "Your type of partner",
+    "otherTypePlaceholder": "For example: Mosque food committee",
+    "otherFoodTypeLabel": "Other food type",
+    "otherFoodTypePlaceholder": "For example: Animal feed"
+  },
+  "foodCategories": {
+    "bread_and_baked_goods": "Bread and baked goods",
+    "cooked_meals": "Cooked meals",
+    "fruit_and_vegetables": "Fruit and vegetables",
+    "dairy_and_eggs": "Dairy and eggs",
+    "meat_poultry_and_fish": "Meat, poultry and fish",
+    "packaged_and_dry_food": "Packaged and dry food",
+    "other": "Other"
+  },
+  "location": {
+    "title": "Location",
+    "instructions": "Drag the pin to the exact spot where food is collected, then type the written address.",
+    "permissionDenied": "NoWaste needs your location to place the pin. You can still place it by hand: tap the map, then drag the pin to the exact spot.",
+    "mapLabel": "Map: drag the pin to the exact location",
+    "noPin": "No pin placed yet",
+    "pinAt": "Pin: {{latitude}}, {{longitude}}",
+    "addressLabel": "Written address",
+    "addressPlaceholder": "Street, building and area",
+    "addressFromPin": "Address filled in from the pin. Check it and correct it if needed.",
+    "addressNotFound": "We could not find this address on the map. Place the pin by hand: tap the map, then drag the pin to the exact spot.",
+    "detect": "Use my current location",
+    "detecting": "Finding your location…",
+    "detectHint": "Moves the pin back to where your phone is now"
+  },
+  "applied": {
+    "title": "Application sent",
+    "message": "Your application is Pending until an administrator reviews it.",
+    "next": "Log in will be available soon. You can then see the status of your application.",
     "backToStart": "Back to start"
   }
 }

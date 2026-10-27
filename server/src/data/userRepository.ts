@@ -1,8 +1,8 @@
 // C-27 Data Access: the users table (SDD 4.2 "User").
-import { DatabaseError } from 'pg';
+import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { getPool } from './db.js';
 
-export type Role = 'consumer' | 'vendor' | 'charity' | 'composting' | 'admin';
+export type Role = 'consumer' | 'vendor' | 'charity' | 'composting' | 'other' | 'admin';
 export type AccountStatus = 'Active' | 'Pending' | 'Approved' | 'Rejected' | 'Suspended' | 'Removed';
 export type Language = 'ar' | 'en';
 
@@ -35,9 +35,12 @@ export class DuplicateUserError extends Error {
 
 const columns = `id, email, phone, password_hash AS "passwordHash", role, status, language, created_at AS "createdAt"`;
 
-export async function insertUser(user: NewUser): Promise<UserRecord> {
+/** Anything that can run a query: the pool, or a client inside a transaction. */
+type Queryable = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
+
+export async function insertUser(user: NewUser, db: Queryable = getPool()): Promise<UserRecord> {
   try {
-    const result = await getPool().query<UserRecord>(
+    const result = await db.query<UserRecord>(
       `INSERT INTO users (email, phone, password_hash, role, status, language)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING ${columns}`,

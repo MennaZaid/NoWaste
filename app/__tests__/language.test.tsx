@@ -21,11 +21,11 @@ describe('FR-ACC-09 switching between Arabic and English', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: 'العربية' }));
     expect(await screen.findByText('مرحبًا بك في NoWaste')).toBeOnTheScreen();
-    expect(screen.getByText('إنشاء حساب')).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'مستهلك' })).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole('button', { name: 'English' }));
     expect(await screen.findByText('Welcome to NoWaste')).toBeOnTheScreen();
-    expect(screen.getByText('Register')).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'Consumer' })).toBeOnTheScreen();
   });
 
   test('FR-ACC-09 the language choice is saved on the device', async () => {

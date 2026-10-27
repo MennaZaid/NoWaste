@@ -4,6 +4,7 @@ import RootLayout from '../../app/_layout';
 import WelcomeScreen from '../../app/index';
 import RegisterScreen from '../../app/register';
 import RegisteredScreen from '../../app/registered';
+import AppliedScreen from '../../app/applied';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -12,6 +13,7 @@ export function renderApp(initialUrl = '/') {
       index: WelcomeScreen,
       register: RegisterScreen,
       registered: RegisteredScreen,
+      applied: AppliedScreen,
     },
     { initialUrl },
   );

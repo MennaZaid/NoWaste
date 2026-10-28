@@ -62,6 +62,17 @@ function normalizeEgyptianPhone(phone) {
   return EGYPT_LANDLINE.test(digits) ? `+20${digits.slice(1)}` : null;
 }
 
+/**
+ * FR-ACC-04: the login field takes an email address or an Egyptian mobile number. Returns which one it is, in the
+ * form it is stored in (trimmed email; phone in +20 form), or null when it is neither.
+ */
+function parseLoginIdentifier(value) {
+  if (typeof value !== 'string') return null;
+  if (value.includes('@')) return isValidEmail(value) ? { email: value.trim() } : null;
+  const phone = normalizeEgyptianMobile(value);
+  return phone === null ? null : { phone };
+}
+
 function isBlank(value) {
   return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
 }
@@ -241,6 +252,7 @@ module.exports = {
   isValidPassword,
   isValidEmail,
   normalizeEgyptianMobile,
+  parseLoginIdentifier,
   normalizeEgyptianPhone,
   validateRegistration,
   validateSignUp,

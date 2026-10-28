@@ -1,5 +1,5 @@
 // Welcome screen role selection (decision D-30): the user first chooses Consumer, Vendor, Partner or Administrator,
-// then Register (sign up) or Log in (sign in). Administrators only log in (SRS 2.7). Log in is US-04 (D-20).
+// then Register (sign up) or Log in (sign in). Administrators only log in (SRS 2.7). Log in opens the Log in screen (US-04).
 // Covers FR-ACC-01, FR-ACC-02, FR-ACC-03, FR-ACC-09, IF-UI-02, IF-UI-03 and NFR-07a.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -107,23 +107,22 @@ describe('D-30 the Welcome screen starts with the role selection', () => {
     ).toBeOnTheScreen();
   });
 
-  test('D-20 Log in after choosing a role explains that log in is coming soon', async () => {
-    await openWelcome();
+  test('FR-ACC-04 Log in after choosing Administrator opens the Log in screen', async () => {
+    const app = await openWelcome();
     await chooseRole('Administrator');
     await fireEvent.press(screen.getByTestId('welcome-login'));
 
-    expect(screen.getByText('Log in will be available soon.')).toBeOnTheScreen();
+    expect(await screen.findByLabelText('Email address or mobile number')).toBeOnTheScreen();
+    expect(app.getPathname()).toBe('/login');
   });
 
-  test('D-30 changing the role from Administrator to Vendor brings Register back and hides the notes', async () => {
+  test('D-30 changing the role from Administrator to Vendor brings Register back and hides the note', async () => {
     await openWelcome();
     await chooseRole('Administrator');
-    await fireEvent.press(screen.getByTestId('welcome-login'));
     await chooseRole('Vendor');
 
     expect(screen.getByTestId('welcome-register')).toBeOnTheScreen();
     expect(screen.queryByText(/Administrator accounts are created/)).toBeNull();
-    expect(screen.queryByText('Log in will be available soon.')).toBeNull();
   });
 
   test('D-30 a Register screen opened without a role shows the consumer form', async () => {

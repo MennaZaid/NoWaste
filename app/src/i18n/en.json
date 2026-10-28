@@ -12,7 +12,17 @@
   "home": {
     "serverChecking": "Server: checking…",
     "serverConnected": "Server: connected",
-    "serverNotReachable": "Server: not reachable"
+    "serverNotReachable": "Server: not reachable",
+    "title": "NoWaste",
+    "consumer": "You are logged in. Nearby food listings will appear here in a later sprint.",
+    "vendor": "Your shop is approved. Posting food comes in a later sprint.",
+    "partner": "Your organisation is approved. Food offers come in a later sprint.",
+    "applicationTitle": "Application status",
+    "applicationPending": "Your application is Pending. An administrator is reviewing it.",
+    "applicationRejected": "Your application was Rejected.",
+    "noFoodUntilApproved": "You cannot post or receive food until your application is approved.",
+    "suspendedTitle": "Account suspended",
+    "suspended": "Your account is suspended. You cannot use NoWaste functions. Contact the NoWaste team if you think this is a mistake."
   },
   "welcome": {
     "title": "Welcome to NoWaste",
@@ -20,8 +30,7 @@
     "register": "Register",
     "registerHint": "Create a new account for the chosen role",
     "login": "Log in",
-    "loginHint": "Log in is not available yet",
-    "loginComingSoon": "Log in will be available soon.",
+    "loginHint": "Opens the Log in screen",
     "roleLabel": "I am a",
     "roles": {
       "consumer": "Consumer",
@@ -91,7 +100,10 @@
     "otherPartnerTypeRequired": "Write what type of partner you are.",
     "otherPartnerTypeTooLong": "Keep the type of partner to {{max}} characters or fewer.",
     "otherFoodTypeRequired": "Write the other food type you accept.",
-    "otherFoodTypeTooLong": "Keep the other food type to {{max}} characters or fewer."
+    "otherFoodTypeTooLong": "Keep the other food type to {{max}} characters or fewer.",
+    "loginInvalid": "The email address, mobile number or password is not correct. Several failed tries pause logging in to this account for a while.",
+    "identifierRequired": "Enter your email address or mobile number.",
+    "passwordRequired": "Enter your password."
   },
   "duplicate": {
     "emailTitle": "This email is already registered",
@@ -105,7 +117,7 @@
     "title": "Account created",
     "successLabel": "Success",
     "message": "Your NoWaste consumer account is ready.",
-    "next": "Log in will be available soon. You can then start finding food near you.",
+    "next": "You can now log in and start finding food near you.",
     "backToStart": "Back to start"
   },
   "accountTypes": {
@@ -167,7 +179,64 @@
   "applied": {
     "title": "Application sent",
     "message": "Your application is Pending until an administrator reviews it.",
-    "next": "Log in will be available soon. You can then see the status of your application.",
+    "next": "You can log in at any time to see the status of your application.",
     "backToStart": "Back to start"
+  },
+  "login": {
+    "title": "Log in",
+    "intro": "Log in with the email address or mobile number you registered with.",
+    "identifierLabel": "Email address or mobile number",
+    "identifierPlaceholder": "name@example.com or 01012345678",
+    "passwordLabel": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…"
+  },
+  "session": {
+    "logout": "Log out",
+    "logoutHint": "Ends your session on this phone",
+    "ended": "Your session has ended. Please log in again."
+  },
+  "admin": {
+    "pendingTitle": "Pending applications",
+    "empty": "No applications are waiting.",
+    "loadFailed": "The applications could not be loaded.",
+    "retry": "Try again",
+    "vendorLine": "Vendor · {{type}}",
+    "otherPartnerLine": "Other partner: {{text}}",
+    "detailsTitle": "Application",
+    "shopName": "Shop name",
+    "organisationName": "Organisation name",
+    "applicantType": "Type",
+    "vendorType": "Vendor type",
+    "partnerType": "Type of partner",
+    "loginEmail": "Email address",
+    "loginPhone": "Mobile number",
+    "contact": "Contact number",
+    "description": "Shop description",
+    "foodTypes": "Food types accepted",
+    "otherFoodType": "Other: {{text}}",
+    "address": "Written address",
+    "location": "Location",
+    "submittedAt": "Sent on",
+    "approve": "Approve",
+    "reject": "Reject",
+    "confirmApprove": "Approve this application? The applicant can then use NoWaste.",
+    "confirmReject": "Reject this application?",
+    "yesApprove": "Yes, approve",
+    "yesReject": "Yes, reject",
+    "cancel": "Cancel",
+    "approved": "Application approved.",
+    "rejected": "Application rejected.",
+    "conflict": "This application was already decided. Its status is now {{status}}.",
+    "gone": "This application is no longer waiting.",
+    "decideFailed": "The decision could not be saved. Try again."
+  },
+  "statuses": {
+    "Active": "Active",
+    "Pending": "Pending",
+    "Approved": "Approved",
+    "Rejected": "Rejected",
+    "Suspended": "Suspended",
+    "Removed": "Removed"
   }
 }

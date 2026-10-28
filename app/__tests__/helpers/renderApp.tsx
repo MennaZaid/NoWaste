@@ -5,6 +5,9 @@ import WelcomeScreen from '../../app/index';
 import RegisterScreen from '../../app/register';
 import RegisteredScreen from '../../app/registered';
 import AppliedScreen from '../../app/applied';
+import LoginScreen from '../../app/login';
+import HomeScreen from '../../app/home';
+import ApplicationScreen from '../../app/admin/[userId]';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -14,6 +17,9 @@ export function renderApp(initialUrl = '/') {
       register: RegisterScreen,
       registered: RegisteredScreen,
       applied: AppliedScreen,
+      login: LoginScreen,
+      home: HomeScreen,
+      'admin/[userId]': ApplicationScreen,
     },
     { initialUrl },
   );

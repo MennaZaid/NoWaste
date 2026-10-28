@@ -69,3 +69,35 @@ export async function findUserByPhone(phone: string): Promise<UserRecord | undef
   const result = await getPool().query<UserRecord>(`SELECT ${columns} FROM users WHERE phone = $1`, [phone]);
   return result.rows[0];
 }
+
+/** Returns undefined for an unknown id, including text that is not a UUID. */
+export async function findUserById(id: string): Promise<UserRecord | undefined> {
+  const result = await getPool().query<UserRecord>(`SELECT ${columns} FROM users WHERE id::text = $1`, [id]);
+  return result.rows[0];
+}
+
+export async function updateLanguage(id: string, language: Language): Promise<UserRecord | undefined> {
+  const result = await getPool().query<UserRecord>(
+    `UPDATE users SET language = $2 WHERE id = $1 RETURNING ${columns}`,
+    [id, language],
+  );
+  return result.rows[0];
+}
+
+/**
+ * Moves a vendor or partner from `from` to `to` in one statement, so two administrators deciding at the same time
+ * cannot both succeed. Returns undefined when the user is not a vendor or partner in status `from`.
+ */
+export async function updateApplicantStatus(
+  id: string,
+  from: AccountStatus,
+  to: AccountStatus,
+): Promise<UserRecord | undefined> {
+  const result = await getPool().query<UserRecord>(
+    `UPDATE users SET status = $3
+     WHERE id::text = $1 AND status = $2 AND role IN ('vendor', 'charity', 'composting', 'other')
+     RETURNING ${columns}`,
+    [id, from, to],
+  );
+  return result.rows[0];
+}

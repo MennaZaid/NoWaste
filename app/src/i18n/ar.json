@@ -12,7 +12,17 @@
   "home": {
     "serverChecking": "الخادم: جارٍ التحقق…",
     "serverConnected": "الخادم: متصل",
-    "serverNotReachable": "الخادم: تعذّر الوصول"
+    "serverNotReachable": "الخادم: تعذّر الوصول",
+    "title": "NoWaste",
+    "consumer": "تم تسجيل دخولك. ستظهر عروض الطعام القريبة هنا في مرحلة لاحقة.",
+    "vendor": "تمت الموافقة على محلك. نشر الطعام يأتي في مرحلة لاحقة.",
+    "partner": "تمت الموافقة على جهتك. عروض الطعام تأتي في مرحلة لاحقة.",
+    "applicationTitle": "حالة الطلب",
+    "applicationPending": "طلبك معلّق. يراجعه أحد المسؤولين.",
+    "applicationRejected": "تم رفض طلبك.",
+    "noFoodUntilApproved": "لا يمكنك نشر الطعام أو استلامه حتى تتم الموافقة على طلبك.",
+    "suspendedTitle": "الحساب موقوف",
+    "suspended": "حسابك موقوف. لا يمكنك استخدام وظائف NoWaste. تواصل مع فريق NoWaste إذا كنت تظن أن هذا خطأ."
   },
   "welcome": {
     "title": "مرحبًا بك في NoWaste",
@@ -20,8 +30,7 @@
     "register": "إنشاء حساب",
     "registerHint": "إنشاء حساب جديد للدور المختار",
     "login": "تسجيل الدخول",
-    "loginHint": "تسجيل الدخول غير متاح بعد",
-    "loginComingSoon": "سيتوفر تسجيل الدخول قريبًا.",
+    "loginHint": "يفتح شاشة تسجيل الدخول",
     "roleLabel": "أنا",
     "roles": {
       "consumer": "مستهلك",
@@ -91,7 +100,10 @@
     "otherPartnerTypeRequired": "اكتب نوع الشريك لديكم.",
     "otherPartnerTypeTooLong": "يجب ألا يزيد نوع الشريك عن {{max}} حرفًا.",
     "otherFoodTypeRequired": "اكتب نوع الطعام الآخر الذي تقبلونه.",
-    "otherFoodTypeTooLong": "يجب ألا يزيد نوع الطعام الآخر عن {{max}} حرفًا."
+    "otherFoodTypeTooLong": "يجب ألا يزيد نوع الطعام الآخر عن {{max}} حرفًا.",
+    "loginInvalid": "البريد الإلكتروني أو رقم المحمول أو كلمة المرور غير صحيح. بعد عدة محاولات فاشلة يتوقف تسجيل الدخول لهذا الحساب لفترة.",
+    "identifierRequired": "أدخل بريدك الإلكتروني أو رقم المحمول.",
+    "passwordRequired": "أدخل كلمة المرور."
   },
   "duplicate": {
     "emailTitle": "هذا البريد الإلكتروني مسجّل بالفعل",
@@ -105,7 +117,7 @@
     "title": "تم إنشاء الحساب",
     "successLabel": "تم بنجاح",
     "message": "حسابك كمستهلك في NoWaste جاهز.",
-    "next": "سيتوفر تسجيل الدخول قريبًا، وبعدها يمكنك البحث عن الطعام القريب منك.",
+    "next": "يمكنك الآن تسجيل الدخول والبحث عن الطعام القريب منك.",
     "backToStart": "العودة إلى البداية"
   },
   "accountTypes": {
@@ -167,7 +179,64 @@
   "applied": {
     "title": "تم إرسال الطلب",
     "message": "طلبك قيد المراجعة إلى أن يراجعه أحد المسؤولين.",
-    "next": "سيتوفر تسجيل الدخول قريبًا، وستتمكن عندها من متابعة حالة طلبك.",
+    "next": "يمكنك تسجيل الدخول في أي وقت لمعرفة حالة طلبك.",
     "backToStart": "العودة إلى البداية"
+  },
+  "login": {
+    "title": "تسجيل الدخول",
+    "intro": "سجّل الدخول بالبريد الإلكتروني أو رقم المحمول الذي سجّلت به.",
+    "identifierLabel": "البريد الإلكتروني أو رقم المحمول",
+    "identifierPlaceholder": "name@example.com أو 01012345678",
+    "passwordLabel": "كلمة المرور",
+    "submit": "تسجيل الدخول",
+    "submitting": "جارٍ تسجيل الدخول…"
+  },
+  "session": {
+    "logout": "تسجيل الخروج",
+    "logoutHint": "ينهي جلستك على هذا الهاتف",
+    "ended": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى."
+  },
+  "admin": {
+    "pendingTitle": "الطلبات المعلّقة",
+    "empty": "لا توجد طلبات في الانتظار.",
+    "loadFailed": "تعذّر تحميل الطلبات.",
+    "retry": "حاول مرة أخرى",
+    "vendorLine": "بائع · {{type}}",
+    "otherPartnerLine": "شريك آخر: {{text}}",
+    "detailsTitle": "الطلب",
+    "shopName": "اسم المحل",
+    "organisationName": "اسم الجهة",
+    "applicantType": "النوع",
+    "vendorType": "نوع النشاط",
+    "partnerType": "نوع الشريك",
+    "loginEmail": "البريد الإلكتروني",
+    "loginPhone": "رقم المحمول",
+    "contact": "رقم التواصل",
+    "description": "وصف المحل",
+    "foodTypes": "أنواع الطعام المقبولة",
+    "otherFoodType": "أخرى: {{text}}",
+    "address": "العنوان",
+    "location": "الموقع",
+    "submittedAt": "تاريخ الإرسال",
+    "approve": "قبول",
+    "reject": "رفض",
+    "confirmApprove": "هل تريد قبول هذا الطلب؟ سيتمكن مقدّم الطلب بعدها من استخدام NoWaste.",
+    "confirmReject": "هل تريد رفض هذا الطلب؟",
+    "yesApprove": "نعم، اقبل",
+    "yesReject": "نعم، ارفض",
+    "cancel": "إلغاء",
+    "approved": "تم قبول الطلب.",
+    "rejected": "تم رفض الطلب.",
+    "conflict": "تم البت في هذا الطلب بالفعل. حالته الآن: {{status}}.",
+    "gone": "هذا الطلب لم يعد في الانتظار.",
+    "decideFailed": "تعذّر حفظ القرار. حاول مرة أخرى."
+  },
+  "statuses": {
+    "Active": "نشط",
+    "Pending": "معلّق",
+    "Approved": "مقبول",
+    "Rejected": "مرفوض",
+    "Suspended": "موقوف",
+    "Removed": "محذوف"
   }
 }

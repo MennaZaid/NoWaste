@@ -44,3 +44,41 @@ export async function listFoodCategoryEnum(): Promise<string[]> {
   );
   return result.rows.map((row) => row.value);
 }
+
+/** Sets an account status directly, for states that have no API yet (for example Suspended, US-08). */
+export async function setUserStatus(userId: string, status: string): Promise<void> {
+  await getPool().query('UPDATE users SET status = $2 WHERE id = $1', [userId, status]);
+}
+
+/** Inserts an administrator the way the team does (SRS 2.7), with the given bcrypt hash. */
+export async function insertAdmin(email: string, passwordHash: string): Promise<string> {
+  const result = await getPool().query<{ id: string }>(
+    `INSERT INTO users (email, password_hash, role, status, language) VALUES ($1, $2, 'admin', 'Active', 'en')
+     RETURNING id`,
+    [email, passwordHash],
+  );
+  return result.rows[0]?.id ?? '';
+}
+
+export async function readUserStatus(userId: string): Promise<string | undefined> {
+  const result = await getPool().query<{ status: string }>('SELECT status FROM users WHERE id = $1', [
+    userId,
+  ]);
+  return result.rows[0]?.status;
+}
+
+export async function readSession(jti: string) {
+  const result = await getPool().query<{ userId: string; endedAt: Date | null }>(
+    'SELECT user_id AS "userId", ended_at AS "endedAt" FROM sessions WHERE jti = $1',
+    [jti],
+  );
+  return result.rows[0];
+}
+
+export async function countLoginAttempts(userId: string): Promise<number> {
+  const result = await getPool().query<{ count: string }>(
+    'SELECT count(*) AS count FROM login_attempts WHERE user_id = $1',
+    [userId],
+  );
+  return Number(result.rows[0]?.count ?? 0);
+}

@@ -1,10 +1,11 @@
 // Welcome screen (US-09, US-01, US-02, US-03): logo, welcome message, English / العربية switch, the role selection
-// (Consumer, Vendor, Partner, Administrator), then Register and Log in.
+// (Consumer, Vendor, Partner, Administrator), then Register and Log in (US-04). With a saved session it opens the
+// home screen instead.
 // The language can be switched here before registration or login (FR-ACC-09, IF-UI-02).
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -14,6 +15,7 @@ import { Notice } from '@/components/Notice';
 import { OptionList } from '@/components/OptionList';
 import { Screen } from '@/components/Screen';
 import { ServerStatus } from '@/components/ServerStatus';
+import { useAuth } from '@/auth/AuthProvider';
 import { colors, radius, spacing } from '@/theme';
 
 // D-30: the user first says who they are, then registers or logs in. Partners choose Charity or Composting on the
@@ -24,8 +26,18 @@ type WelcomeRole = (typeof WELCOME_ROLES)[number];
 export default function WelcomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { phase, token } = useAuth();
   const [role, setRole] = useState<WelcomeRole | null>(null);
-  const [showLoginNote, setShowLoginNote] = useState(false);
+
+  // US-04: with a saved session the app opens on the home screen of the user's role.
+  if (phase === 'restoring') {
+    return (
+      <Screen contentStyle={styles.loading}>
+        <ActivityIndicator color={colors.primary} />
+      </Screen>
+    );
+  }
+  if (token !== null) return <Redirect href="/home" />;
 
   return (
     <Screen edges={['top']} backgroundColor={colors.primary}>
@@ -55,7 +67,6 @@ export default function WelcomeScreen() {
             selected={role === null ? [] : [role]}
             onToggle={(next) => {
               setRole(next);
-              setShowLoginNote(false);
             }}
           />
 
@@ -73,17 +84,16 @@ export default function WelcomeScreen() {
                   }}
                 />
               )}
-              {/* Log in is US-04 (turn 3). Until then the button only explains that it is coming. */}
+              {/* US-04: one Log in screen for every role; the server says which role the account has. */}
               <Button
                 testID="welcome-login"
                 variant="secondary"
                 label={t('welcome.login')}
                 accessibilityHint={t('welcome.loginHint')}
                 onPress={() => {
-                  setShowLoginNote(true);
+                  router.push('/login');
                 }}
               />
-              {showLoginNote ? <Notice tone="info" message={t('welcome.loginComingSoon')} /> : null}
             </View>
           ) : null}
 
@@ -97,6 +107,10 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scroll: {
     flexGrow: 1,
   },
@@ -106,7 +120,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl + spacing.lg,
     gap: spacing.lg,
   },
+  // D-38: the language switch stays in the top corner on the same side in both languages (not mirrored).
   topBar: {
+    direction: 'ltr',
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },

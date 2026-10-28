@@ -1,11 +1,25 @@
 // C-03 Account Service: sign-up for consumers (US-01, FR-ACC-01), vendors (US-02, FR-ACC-02) and charity or
 // composting partners (US-03, FR-ACC-03), with E-ACC-01, E-ACC-02 and NFR-09b.
 // Consumers are Active at once; vendors and partners are Pending until an administrator reviews them (US-07).
-// Administrator accounts are created by the team, never here (SRS 2.7).
+// Administrator accounts are created by the team, never here (SRS 2.7). Also the user's own account (GET and PATCH
+// /users/me, FR-ACC-09). Login and logout are in authService.ts.
 import bcrypt from 'bcryptjs';
-import { validateSignUp, type SignUpInput, type SignUpRole } from '@nowaste/shared';
+import {
+  LANGUAGES,
+  validateRegistration,
+  validateSignUp,
+  type Language,
+  type SignUpInput,
+  type SignUpRole,
+} from '@nowaste/shared';
 import { SrsError } from '../../domain/errors.js';
-import { DuplicateUserError, insertUser, type NewUser, type UserRecord } from '../../data/userRepository.js';
+import {
+  DuplicateUserError,
+  insertUser,
+  updateLanguage,
+  type NewUser,
+  type UserRecord,
+} from '../../data/userRepository.js';
 import { insertPartnerApplication, insertVendorApplication } from '../../data/profileRepository.js';
 import { BCRYPT_COST } from '../../config/security.js';
 
@@ -45,4 +59,68 @@ export async function signUp(input: SignUpInput): Promise<SignedUpUser> {
     throw error;
   }
   return { id: created.id, role, status };
+}
+
+export interface Me {
+  id: string;
+  role: SignUpRole | 'admin';
+  status: UserRecord['status'];
+  language: UserRecord['language'];
+  email: string | null;
+  phone: string | null;
+}
+
+function toMe(user: UserRecord): Me {
+  return {
+    id: user.id,
+    role: user.role,
+    status: user.status,
+    language: user.language,
+    email: user.email,
+    phone: user.phone,
+  };
+}
+
+/** GET /users/me. */
+export function getMe(user: UserRecord): Me {
+  return toMe(user);
+}
+
+/** PATCH /users/me: saves the language on the account (FR-ACC-09, decision D-16). */
+export async function setLanguage(user: UserRecord, language: unknown): Promise<Me> {
+  if (!LANGUAGES.includes(language as Language)) {
+    throw new SrsError(400, { error: 'invalid_input', fields: ['language'] });
+  }
+  const updated = await updateLanguage(user.id, language as Language);
+  return toMe(updated ?? user);
+}
+
+/**
+ * SRS 2.7: the team creates administrator accounts (npm run seed:admin). The email and password follow the US-01
+ * rules; the account is Active at once.
+ */
+export async function createAdmin(input: {
+  email: unknown;
+  password: unknown;
+  language?: unknown;
+}): Promise<{ id: string; role: 'admin'; status: 'Active' }> {
+  const validation = validateRegistration({ ...input, language: input.language ?? 'en' });
+  if (!validation.ok) throw new SrsError(400, { error: 'E-ACC-02', fields: validation.fields });
+  const { email, phone, password, language } = validation.value;
+  const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+  try {
+    const created = await insertUser({
+      email,
+      phone,
+      passwordHash,
+      role: 'admin',
+      status: 'Active',
+      language,
+    });
+    return { id: created.id, role: 'admin', status: 'Active' };
+  } catch (error) {
+    if (error instanceof DuplicateUserError)
+      throw new SrsError(409, { error: 'E-ACC-01', field: error.field });
+    throw error;
+  }
 }

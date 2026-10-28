@@ -12,4 +12,7 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  // Login tests hash several passwords with bcrypt cost 12 (NFR-09b) on purpose, which can pass Jest's default
+  // 5-second limit on a slow or busy laptop. The limit only stops a hung test; it does not change what is checked.
+  testTimeout: 20000,
 };

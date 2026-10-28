@@ -121,3 +121,6 @@ export interface ValidSignUp extends ValidRegistration {
 export type SignUpValidation = { ok: true; value: ValidSignUp } | { ok: false; fields: SignUpField[] };
 
 export declare function validateSignUp(input: SignUpInput): SignUpValidation;
+
+/** FR-ACC-04: an email address or an Egyptian mobile number (returned in +20 form), or null. */
+export declare function parseLoginIdentifier(value: unknown): { email: string } | { phone: string } | null;

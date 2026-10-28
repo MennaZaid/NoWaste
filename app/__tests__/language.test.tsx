@@ -97,3 +97,27 @@ describe('IF-UI-03 the navigation header mirrors in Arabic (LocaleProvider, deci
     },
   );
 });
+
+describe('IF-UI-02 the language switch stays in place (decision D-38)', () => {
+  function switchOrder() {
+    return screen
+      .getAllByRole('button')
+      .map((button) => button.props.accessibilityLabel as string)
+      .filter((label) => label === 'English' || label === 'العربية');
+  }
+
+  test('IF-UI-02 the switch keeps the order English | العربية and its side in English and in Arabic', async () => {
+    await renderApp('/');
+    await screen.findByText('Welcome to NoWaste');
+    expect(screen.getByTestId('language-switch')).toHaveStyle({ direction: 'ltr' });
+    expect(switchOrder()).toEqual(['English', 'العربية']);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'العربية' }));
+    await screen.findByText('مرحبًا بك في NoWaste');
+
+    // The screen is mirrored, but the switch is not: same order, same side.
+    expect(screen.getByTestId('screen-root')).toHaveStyle({ direction: 'rtl' });
+    expect(screen.getByTestId('language-switch')).toHaveStyle({ direction: 'ltr' });
+    expect(switchOrder()).toEqual(['English', 'العربية']);
+  });
+});

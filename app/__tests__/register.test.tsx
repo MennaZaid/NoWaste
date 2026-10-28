@@ -224,7 +224,7 @@ describe('Register screen details', () => {
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeOnTheScreen();
   });
 
-  test('E-ACC-01 Log in in the already-registered notice explains that log in is coming soon (D-20)', async () => {
+  test('E-ACC-01 FR-ACC-04 Log in in the already-registered notice opens Log in with the email filled in', async () => {
     mockedRegister.mockResolvedValue({ kind: 'duplicate', field: 'email' });
     await openRegister();
 
@@ -233,18 +233,21 @@ describe('Register screen details', () => {
     await submit();
     await fireEvent.press(await screen.findByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('Log in will be available soon.')).toBeOnTheScreen();
+    expect(await screen.findByLabelText('Email address or mobile number')).toHaveDisplayValue(
+      'mona@example.com',
+    );
   });
 });
 
 describe('Welcome and Account created screens', () => {
-  test('D-20 Log in on the Welcome screen explains that log in is coming soon', async () => {
-    await renderApp('/');
+  test('FR-ACC-04 Log in on the Welcome screen opens the Log in screen', async () => {
+    const app = await renderApp('/');
     // D-30: a role is chosen first; Log in then appears.
     await fireEvent.press(await screen.findByRole('radio', { name: 'Consumer' }));
     await fireEvent.press(screen.getByTestId('welcome-login'));
 
-    expect(await screen.findByText('Log in will be available soon.')).toBeOnTheScreen();
+    expect(await screen.findByLabelText('Email address or mobile number')).toBeOnTheScreen();
+    expect(app.getPathname()).toBe('/login');
   });
 
   test('FR-ACC-01 Back to start on the success screen returns to the Welcome screen', async () => {

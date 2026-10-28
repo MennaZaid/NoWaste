@@ -17,6 +17,8 @@ interface MapViewProps {
   onPinChange: (pin: Coordinates) => void;
   accessibilityLabel: string;
   testID?: string;
+  /** Only shows the pin (for example to an administrator reviewing an application, US-07). */
+  readOnly?: boolean;
 }
 
 // About 1 km across: close enough to put the pin on the right building.
@@ -26,7 +28,14 @@ function toCoordinates({ latitude, longitude }: LatLng): Coordinates {
   return { latitude, longitude };
 }
 
-export function MapView({ center, pin, onPinChange, accessibilityLabel, testID }: MapViewProps) {
+export function MapView({
+  center,
+  pin,
+  onPinChange,
+  accessibilityLabel,
+  testID,
+  readOnly = false,
+}: MapViewProps) {
   return (
     <View style={styles.frame} testID={testID}>
       <MapViewNative
@@ -36,13 +45,13 @@ export function MapView({ center, pin, onPinChange, accessibilityLabel, testID }
         initialRegion={{ ...center, ...ZOOM }}
         accessibilityLabel={accessibilityLabel}
         onPress={(event) => {
-          onPinChange(toCoordinates(event.nativeEvent.coordinate));
+          if (!readOnly) onPinChange(toCoordinates(event.nativeEvent.coordinate));
         }}
       >
         {pin !== null ? (
           <Marker
             coordinate={pin}
-            draggable
+            draggable={!readOnly}
             pinColor={colors.primary}
             onDragEnd={(event) => {
               onPinChange(toCoordinates(event.nativeEvent.coordinate));

@@ -57,7 +57,6 @@ export default function RegisterScreen() {
   const [duplicate, setDuplicate] = useState<Method | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [showResetNote, setShowResetNote] = useState(false);
-  const [showLoginNote, setShowLoginNote] = useState(false);
   // Vendor (US-02) and partner (US-03) details.
   const [shopName, setShopName] = useState('');
   const [vendorType, setVendorType] = useState<VendorType>('formal');
@@ -155,7 +154,6 @@ export default function RegisterScreen() {
     setDuplicate(null);
     setProblem(null);
     setShowResetNote(false);
-    setShowLoginNote(false);
 
     if (!isConsumer) {
       const application = applicationBody();
@@ -217,13 +215,14 @@ export default function RegisterScreen() {
           message={t('duplicate.message')}
         >
           <View style={styles.duplicateActions}>
-            {/* Log in is US-04 (turn 3); password reset is US-05, whose SRS 6.2 fallback is a reset by the team. */}
+            {/* Log in (US-04) opens with the email or number filled in; password reset is US-05, whose SRS 6.2
+                fallback is a reset by the team. */}
             <Button
               variant="secondary"
               label={t('duplicate.login')}
               accessibilityHint={t('welcome.loginHint')}
               onPress={() => {
-                setShowLoginNote(true);
+                router.push({ pathname: '/login', params: { identifier } });
               }}
             />
             <Button
@@ -234,7 +233,6 @@ export default function RegisterScreen() {
               }}
             />
           </View>
-          {showLoginNote ? <AppText variant="caption">{t('welcome.loginComingSoon')}</AppText> : null}
           {showResetNote ? <AppText variant="caption">{t('duplicate.resetContact')}</AppText> : null}
         </Notice>
       ) : null}

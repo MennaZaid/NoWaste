@@ -22,3 +22,28 @@ export function headerDirections(): unknown[] {
   walk(screen.root);
   return found;
 }
+
+/** For every header slot ("left", "right", "center"), the testIDs and image labels inside it, in order. */
+export function headerSlotContents(): { slot: unknown; items: string[] }[] {
+  const slots: { slot: unknown; items: string[] }[] = [];
+  const collect = (node: unknown, items: string[]) => {
+    if (!isNode(node)) return;
+    if (typeof node.props.testID === 'string') items.push(node.props.testID);
+    if (node.props.accessibilityRole === 'image' && typeof node.props.accessibilityLabel === 'string') {
+      items.push(`image:${node.props.accessibilityLabel}`);
+    }
+    (node.children ?? []).forEach((child) => {
+      collect(child, items);
+    });
+  };
+  const walk = (node: unknown) => {
+    if (!isNode(node)) return;
+    if (node.type === 'RNSScreenStackHeaderSubview') {
+      const items: string[] = [];
+      collect(node, items);
+      slots.push({ slot: node.props.type, items });
+    } else (node.children ?? []).forEach(walk);
+  };
+  walk(screen.root);
+  return slots;
+}

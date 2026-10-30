@@ -1,4 +1,5 @@
 // Client for the SDD IApi (REST, SDD 3.2.3). The base URL comes from app/.env (EXPO_PUBLIC_API_URL).
+import { File, Paths } from 'expo-file-system';
 import type {
   AcceptedFoodType,
   ListingFoodCategory,
@@ -344,9 +345,10 @@ export async function uploadListingPhoto(
   token: string,
   uri: string,
 ): Promise<ListingAnswer<{ kind: 'ok'; photoKey: string } | { kind: 'failed' }>> {
-  let body: Blob;
+  // The file's own bytes are sent (D-50). A Blob from fetch("file://...") could reach the server empty on Android.
+  let body: ArrayBuffer;
   try {
-    body = await (await fetch(uri)).blob();
+    body = await new File(uri).arrayBuffer();
   } catch {
     return { kind: 'failed' };
   }
@@ -430,6 +432,33 @@ export async function getListing(
   return result.status === 200 && result.data !== null
     ? { kind: 'ok', listing: result.data as unknown as Listing }
     : { kind: 'unexpected' };
+}
+
+/** GET /listings: the vendor's own listings, newest first (US-15, FR-LST-06). */
+export async function getMyListings(token: string): Promise<Protected<{ kind: 'ok'; listings: Listing[] }>> {
+  const result = await protectedCall('/listings', {}, token);
+  if (result.kind !== 'response') return result;
+  return result.status === 200 && Array.isArray(result.data)
+    ? { kind: 'ok', listings: result.data as Listing[] }
+    : { kind: 'unexpected' };
+}
+
+/**
+ * GET /listings/:id/photo, saved in the app's cache; returns the local file to show, or null when it failed.
+ * The photo needs the login token, and the phone's Image component drops request headers on Android (D-51), so the
+ * file is downloaded here with the token and the screen shows the local copy.
+ */
+export async function downloadListingPhoto(token: string, id: string): Promise<string | null> {
+  try {
+    const file = await File.downloadFileAsync(
+      `${getApiBaseUrl()}/listings/${encodeURIComponent(id)}/photo`,
+      new File(Paths.cache, `listing-photo-${id}.jpg`),
+      { headers: { Authorization: `Bearer ${token}` }, idempotent: true },
+    );
+    return file.uri;
+  } catch {
+    return null;
+  }
 }
 
 /** POST /listings/:id/publish: Draft → Active. */

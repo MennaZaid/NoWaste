@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import { LanguageProvider, useLanguage } from '@/i18n/LanguageProvider';
 import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { LogoutButton } from '@/components/LogoutButton';
-import { Logo } from '@/components/Logo';
 import { AuthProvider } from '@/auth/AuthProvider';
 import { colors, spacing } from '@/theme';
 
@@ -55,20 +54,13 @@ function Navigator() {
           <Stack.Screen name="login" options={{ title: t('login.title') }} />
           <Stack.Screen
             name="home"
-            // D-42: the home screen of every role shows the logo instead of the "NoWaste" title text (the title is
-            // kept for screen readers and the app switcher). The logo sits at the start of the header with Log out
-            // right beside it; the language switch alone is at the end (on the right in English).
+            // D-53: the home screen of every role draws its own header (HomeHeader: logo and Log out at the start,
+            // the language switch at the end, D-42), because the native header lost its start side in Arabic on
+            // Android. The title is kept for screen readers and the app switcher.
             options={{
               title: t('home.title'),
-              headerTitle: () => null,
-              headerLeft: () => (
-                <View testID="home-header-start" style={styles.headerActions}>
-                  <Logo width={44} />
-                  <LogoutButton />
-                </View>
-              ),
-              headerRight: () => <LanguageSwitch compact />,
-              headerBackVisible: false,
+              headerShown: false,
+              headerRight: () => null,
               gestureEnabled: false,
             }}
           />
@@ -76,6 +68,7 @@ function Navigator() {
           <Stack.Screen name="listings/new" options={{ title: t('listing.title') }} />
           <Stack.Screen name="listings/quick" options={{ title: t('quickPost.title') }} />
           <Stack.Screen name="listings/[id]" options={{ title: t('listing.detailsTitle') }} />
+          <Stack.Screen name="listings/index" options={{ title: t('myListings.title') }} />
         </Stack>
         <StatusBar style="dark" />
       </View>

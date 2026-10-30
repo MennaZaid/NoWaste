@@ -590,6 +590,107 @@ describe('NFR-08a photo upload (C-26 Storage Adapter)', () => {
   });
 });
 
+describe('FR-LST-06 the vendor views their active and previous listings (US-15, GET /listings)', () => {
+  function myListings(token: string) {
+    return request(app).get('/listings').set('Authorization', `Bearer ${token}`);
+  }
+
+  test('FR-LST-06 the vendor gets every one of their listings, newest first, with its status', async () => {
+    const vendor = await createVendor('informal');
+    const key = await photoKeyFor(vendor.token);
+    clock.now = () => new Date(NOW.getTime() - 60_000);
+    const draft = await post('/listings', vendor.token, fullListing(key));
+    clock.now = () => NOW;
+    const quick = await post('/listings/quick', vendor.token, {
+      photoKey: key,
+      bagsTotal: 2,
+      price: 15,
+      pickupEnd: at(120),
+    });
+
+    const response = await myListings(vendor.token);
+
+    expect(response.status).toBe(200);
+    const listings = response.body as { id: string; status: string; isQuickPost: boolean }[];
+    expect(listings.map((l) => l.id)).toEqual([
+      (quick.body as { id: string }).id,
+      (draft.body as { id: string }).id,
+    ]);
+    expect(listings.map((l) => [l.status, l.isQuickPost])).toEqual([
+      ['Active', true],
+      ['Draft', false],
+    ]);
+  });
+
+  test("FR-LST-06 another vendor's listings are never included", async () => {
+    const vendor = await createVendor('formal');
+    await post('/listings', formal.token, fullListing(photoKey));
+
+    const response = await myListings(vendor.token);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  test('FR-LST-06 a listing keeps showing after it is published (Draft, then Active)', async () => {
+    const vendor = await createVendor('formal');
+    const key = await photoKeyFor(vendor.token);
+    const created = await post('/listings', vendor.token, fullListing(key));
+    const id = (created.body as { id: string }).id;
+    await post(`/listings/${id}/publish`, vendor.token, {});
+
+    const response = await myListings(vendor.token);
+
+    expect(response.body).toMatchObject([{ id, status: 'Active', photoKey: key }]);
+  });
+});
+
+describe('FR-LST-01 the vendor sees the photo of their listing (GET /listings/:id/photo)', () => {
+  test('FR-LST-01 the photo is returned exactly as uploaded, with its type', async () => {
+    const vendor = await createVendor('formal');
+    const bytes = jpeg(3000);
+    bytes[100] = 42;
+    const key = ((await uploadPhoto(vendor.token, bytes)).body as { photoKey: string }).photoKey;
+    const created = await post('/listings', vendor.token, fullListing(key));
+    const id = (created.body as { id: string }).id;
+
+    const response = await request(app)
+      .get(`/listings/${id}/photo`)
+      .set('Authorization', `Bearer ${vendor.token}`)
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          done(null, Buffer.concat(chunks));
+        });
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toBe('image/jpeg');
+    expect(Buffer.compare(response.body as Buffer, bytes)).toBe(0);
+  });
+
+  test("FR-LST-01 a vendor cannot see the photo of another vendor's listing", async () => {
+    const created = await post('/listings', formal.token, fullListing(photoKey));
+    const id = (created.body as { id: string }).id;
+
+    const response = await request(app)
+      .get(`/listings/${id}/photo`)
+      .set('Authorization', `Bearer ${informal.token}`);
+
+    expect(response.status).toBe(404);
+  });
+
+  test('FR-LST-01 the photo of an id that is not a UUID is not found', async () => {
+    const response = await request(app)
+      .get('/listings/not-a-uuid/photo')
+      .set('Authorization', `Bearer ${formal.token}`);
+
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("GET /vendors/me: the vendor's shop details for the listing form", () => {
   test('FR-LST-02 the vendor gets the shop pin and the vendor type', async () => {
     const response = await request(app).get('/vendors/me').set('Authorization', `Bearer ${informal.token}`);

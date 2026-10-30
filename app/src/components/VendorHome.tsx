@@ -1,5 +1,6 @@
-// The Approved vendor's home (US-10, US-11): Create listing for every vendor, and Quick Post for informal vendors only
-// (FR-LST-02). The vendor type comes from GET /vendors/me; until it is known, Quick Post is not shown.
+// The Approved vendor's home (US-10, US-11, US-15): Create listing for every vendor, Quick Post for informal vendors only
+// (FR-LST-02) and My listings (FR-LST-06). The vendor type comes from GET /vendors/me; until it is known, Quick Post is
+// not shown.
 import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -54,6 +55,15 @@ export function VendorHome() {
           }}
         />
       ) : null}
+      <Button
+        testID="home-my-listings"
+        variant="secondary"
+        label={t('vendorHome.myListings')}
+        accessibilityHint={t('vendorHome.myListingsHint')}
+        onPress={() => {
+          router.push('/listings');
+        }}
+      />
     </View>
   );
 }

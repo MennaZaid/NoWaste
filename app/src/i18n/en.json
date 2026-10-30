@@ -341,6 +341,15 @@
     "createListing": "Create listing",
     "createListingHint": "Post surplus food with all its details",
     "quickPost": "Quick Post",
-    "quickPostHint": "Post surplus food with only a photo, bags, price and end time"
+    "quickPostHint": "Post surplus food with only a photo, bags, price and end time",
+    "myListings": "My listings",
+    "myListingsHint": "See your listings and their status"
+  },
+  "myListings": {
+    "title": "My listings",
+    "empty": "You have no listings yet. Use Create listing to post surplus food.",
+    "retry": "Try again",
+    "pickupEnds": "Pickup ends {{time}}",
+    "openHint": "Opens the listing details"
   }
 }

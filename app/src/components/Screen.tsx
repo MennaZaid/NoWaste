@@ -14,6 +14,8 @@ interface ScreenProps {
   edges?: Edge[];
   contentStyle?: ViewStyle;
   backgroundColor?: string;
+  /** A bar drawn by the screen itself above the content, for screens without the navigation header (D-53). */
+  header?: ReactNode;
 }
 
 export function Screen({
@@ -22,6 +24,7 @@ export function Screen({
   edges = ['bottom'],
   contentStyle,
   backgroundColor = colors.background,
+  header,
 }: ScreenProps) {
   const { direction } = useLanguage();
 
@@ -42,6 +45,7 @@ export function Screen({
   return (
     <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor, direction }]}>
       <View testID="screen-root" style={[styles.flex, { direction }]}>
+        {header}
         {content}
       </View>
     </SafeAreaView>

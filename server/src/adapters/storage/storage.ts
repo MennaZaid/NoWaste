@@ -2,7 +2,7 @@
 // Services use only the IStorage interface. Sprint 1 keeps the photos in a local folder; the cloud object storage
 // (C-29) provider is still open (SRS TBD-2, open question 41), and a cloud adapter will implement the same interface.
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -13,6 +13,8 @@ export interface IStorage {
   save(data: Buffer, type: PhotoType): Promise<string>;
   /** Whether a photo with this key exists. */
   exists(key: string): Promise<boolean>;
+  /** The photo and its type, or undefined when there is no photo with this key. */
+  read(key: string): Promise<{ data: Buffer; type: PhotoType } | undefined>;
 }
 
 const EXTENSION: Record<PhotoType, string> = { 'image/jpeg': 'jpg', 'image/png': 'png' };
@@ -35,6 +37,15 @@ export function createLocalFolderStorage(folder: string): IStorage {
         return true;
       } catch {
         return false;
+      }
+    },
+    async read(key) {
+      if (!KEY.test(key)) return undefined;
+      try {
+        const data = await readFile(join(folder, key));
+        return { data, type: key.endsWith('.png') ? 'image/png' : 'image/jpeg' };
+      } catch {
+        return undefined;
       }
     },
   };

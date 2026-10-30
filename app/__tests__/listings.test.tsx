@@ -32,6 +32,7 @@ jest.mock('@/api/client', () => ({
   createQuickPost: jest.fn(),
   getListing: jest.fn(),
   publishListing: jest.fn(),
+  downloadListingPhoto: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('@/listings/compressPhoto', () => ({ compressPhoto: jest.fn() }));

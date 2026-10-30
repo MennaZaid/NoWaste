@@ -1,6 +1,29 @@
 // The API client for US-04 and US-07 (IF-COM-03, E-ACC-03, E-ACC-06, FR-ACC-07): what it sends and how it reads the
 // answers. fetch is mocked.
-import { decideApplication, getMe, listApplications, login, logout } from '@/api/client';
+import {
+  decideApplication,
+  getMe,
+  getMyListings,
+  downloadListingPhoto,
+  listApplications,
+  login,
+  logout,
+} from '@/api/client';
+
+const mockDownload = jest.fn<Promise<unknown>, unknown[]>();
+
+jest.mock('expo-file-system', () => ({
+  Paths: { cache: 'cache-dir' },
+  File: class {
+    static downloadFileAsync(...args: unknown[]): Promise<unknown> {
+      return mockDownload(...args);
+    }
+    parts: unknown[];
+    constructor(...parts: unknown[]) {
+      this.parts = parts;
+    }
+  },
+}));
 
 const mockedFetch = jest.fn();
 
@@ -103,5 +126,48 @@ describe('FR-ACC-07 admin calls', () => {
     expect(sent(0).url).toBe('http://api.test/admin/applications/v1/approve');
     expect(sent(1).url).toBe('http://api.test/admin/applications/v1/reject');
     expect(sent(1).init.method).toBe('POST');
+  });
+});
+
+describe('FR-LST-06 my listings and the listing photo', () => {
+  beforeEach(() => {
+    mockDownload.mockReset();
+  });
+
+  test('FR-LST-06 getMyListings asks GET /listings with the token and returns the list', async () => {
+    const listings = [{ id: 'l2' }, { id: 'l1' }];
+    answer(200, listings);
+
+    expect(await getMyListings('vendor-token')).toEqual({ kind: 'ok', listings });
+    const { url, init, headers } = sent();
+    expect(url).toBe('http://api.test/listings');
+    expect(init.method).toBeUndefined();
+    expect(headers.get('Authorization')).toBe('Bearer vendor-token');
+  });
+
+  test('FR-LST-06 no connection is unreachable and an answer that is not a list is unexpected', async () => {
+    mockedFetch.mockRejectedValueOnce(new TypeError('Network request failed'));
+    answer(200, { id: 'l1' });
+
+    expect(await getMyListings('vendor-token')).toEqual({ kind: 'unreachable' });
+    expect(await getMyListings('vendor-token')).toEqual({ kind: 'unexpected' });
+  });
+
+  // The phone's Image component drops request headers on Android (seen in phone testing: every photo request reached
+  // the server without the token and got 401), so the app downloads the photo with the token into its cache (D-51).
+  test('FR-LST-01 the photo is downloaded from GET /listings/:id/photo with the token into the cache', async () => {
+    mockDownload.mockResolvedValueOnce({ uri: 'file:///cache/listing-photo-l1.jpg' });
+
+    expect(await downloadListingPhoto('vendor-token', 'l1')).toBe('file:///cache/listing-photo-l1.jpg');
+    const [url, destination, options] = mockDownload.mock.calls[0] as [string, { parts: unknown[] }, object];
+    expect(url).toBe('http://api.test/listings/l1/photo');
+    expect(destination.parts).toEqual(['cache-dir', 'listing-photo-l1.jpg']);
+    expect(options).toEqual({ headers: { Authorization: 'Bearer vendor-token' }, idempotent: true });
+  });
+
+  test('FR-LST-01 a photo that cannot be downloaded gives null, so the screen keeps the empty box', async () => {
+    mockDownload.mockRejectedValueOnce(new Error('HTTP 401'));
+
+    expect(await downloadListingPhoto('vendor-token', 'l1')).toBeNull();
   });
 });

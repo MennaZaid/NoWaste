@@ -49,3 +49,37 @@ jest.mock('expo-secure-store', () => {
     }),
   };
 });
+
+// The date-and-time field opens the phone's native picker, which does not run in Jest. The mock is a text input with
+// the same label: tests type an ISO time into it.
+jest.mock('@/components/DateTimeField', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { TextInput } = require('react-native');
+  const { createElement } = require('react');
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return {
+    DateTimeField: ({
+      label,
+      value,
+      onChange,
+      error,
+      disabled,
+      testID,
+    }: {
+      label: string;
+      value: string | null;
+      onChange: (iso: string) => void;
+      error?: string;
+      disabled?: boolean;
+      testID?: string;
+    }) =>
+      createElement(TextInput, {
+        testID,
+        accessibilityLabel: label,
+        accessibilityHint: error,
+        editable: !disabled,
+        value: value ?? '',
+        onChangeText: onChange,
+      }),
+  };
+});

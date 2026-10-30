@@ -5,6 +5,22 @@ export async function deleteAllUsers(): Promise<void> {
   await getPool().query('TRUNCATE users CASCADE');
 }
 
+export async function countListings(): Promise<number> {
+  const result = await getPool().query<{ count: string }>('SELECT count(*) AS count FROM listings');
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+/** A listing row as stored, with the pickup location taken apart by PostGIS. */
+export async function readListingRow(id: string) {
+  const result = await getPool().query<Record<string, unknown>>(
+    `SELECT *, pg_typeof(location)::text AS "locationType",
+            ST_Y(location::geometry) AS latitude, ST_X(location::geometry) AS longitude
+     FROM listings WHERE id = $1`,
+    [id],
+  );
+  return result.rows[0];
+}
+
 export async function countUsers(): Promise<number> {
   const result = await getPool().query<{ count: string }>('SELECT count(*) AS count FROM users');
   return Number(result.rows[0]?.count ?? 0);

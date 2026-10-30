@@ -1,6 +1,8 @@
 // Client for the SDD IApi (REST, SDD 3.2.3). The base URL comes from app/.env (EXPO_PUBLIC_API_URL).
 import type {
   AcceptedFoodType,
+  ListingFoodCategory,
+  StorageCondition,
   Language,
   PartnerProfile,
   PartnerRole,
@@ -23,7 +25,9 @@ async function request(path: string, init: RequestInit = {}, token?: string): Pr
   const headers = new Headers(init.headers);
   // IF-COM-03: the access token received at login goes with every request.
   if (token !== undefined) headers.set('Authorization', `Bearer ${token}`);
-  if (init.body !== undefined) headers.set('Content-Type', 'application/json');
+  // JSON unless the caller sent something else (a listing photo is sent as image/jpeg).
+  if (init.body !== undefined && !headers.has('Content-Type'))
+    headers.set('Content-Type', 'application/json');
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -278,4 +282,170 @@ export async function decideApplication(
   if (result.status === 200 && status !== undefined) return { kind: 'ok', status };
   if (result.status === 409 && status !== undefined) return { kind: 'conflict', status };
   return { kind: 'unexpected' };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Listings (US-10, US-11, US-13). Only Approved vendors may create or publish; others get 403 E-LST-06.
+
+export interface Shop {
+  shopName: string;
+  vendorType: 'formal' | 'informal';
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** GET /vendors/me: the shop pin (start of the pickup location) and the vendor type (Quick Post). */
+export async function getShop(token: string): Promise<Protected<{ kind: 'ok'; shop: Shop }>> {
+  const result = await protectedCall('/vendors/me', {}, token);
+  if (result.kind !== 'response') return result;
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', shop: result.data as unknown as Shop }
+    : { kind: 'unexpected' };
+}
+
+export interface Listing {
+  id: string;
+  status: 'Draft' | 'Active' | 'Fully reserved' | 'Closed' | 'Cancelled';
+  listingType: string | null;
+  isQuickPost: boolean;
+  foodType: string | null;
+  foodCategory: ListingFoodCategory;
+  photoKey: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  bagsTotal: number;
+  bagsAvailable: number;
+  originalValue: number | null;
+  price: number;
+  pickupStart: string;
+  pickupEnd: string;
+  /** An ISO time, "unknown", or null when not asked (Quick Post). */
+  prepTime: string | null;
+  storage: StorageCondition | null;
+  expiryAt: string | null;
+  perishabilityCategory: string | null;
+  latitude: number;
+  longitude: number;
+}
+
+/** E-LST-06 = the vendor is not Approved. */
+type ListingAnswer<T> = Protected<T | { kind: 'notApproved' }>;
+
+function notApproved(result: { status: number; data: Record<string, unknown> | null }): boolean {
+  return result.status === 403 && result.data?.error === 'E-LST-06';
+}
+
+/**
+ * POST /listings/photo with the compressed photo (NFR-08a). E-LST-02: any failure, including no connection, is
+ * "failed", so the form can keep its values and offer Retry.
+ */
+export async function uploadListingPhoto(
+  token: string,
+  uri: string,
+): Promise<ListingAnswer<{ kind: 'ok'; photoKey: string } | { kind: 'failed' }>> {
+  let body: Blob;
+  try {
+    body = await (await fetch(uri)).blob();
+  } catch {
+    return { kind: 'failed' };
+  }
+  const result = await protectedCall(
+    '/listings/photo',
+    { method: 'POST', body, headers: { 'Content-Type': 'image/jpeg' } },
+    token,
+  );
+  if (result.kind === 'unreachable') return { kind: 'failed' };
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  const photoKey = result.data?.photoKey;
+  return result.status === 201 && typeof photoKey === 'string'
+    ? { kind: 'ok', photoKey }
+    : { kind: 'failed' };
+}
+
+export type ListingRequest = {
+  photoKey: string;
+  foodType: string;
+  foodCategory: ListingFoodCategory;
+  descriptionAr: string;
+  descriptionEn: string;
+  bagsTotal: number | undefined;
+  originalValue: number | undefined;
+  price: number | undefined;
+  pickupStart: string | undefined;
+  pickupEnd: string | undefined;
+  prepTime: string | undefined;
+  storage: StorageCondition | undefined;
+  expiryAt: string | undefined;
+  location: { latitude: number; longitude: number } | undefined;
+};
+
+export type QuickPostRequest = {
+  photoKey: string;
+  bagsTotal: number | undefined;
+  price: number | undefined;
+  pickupEnd: string | undefined;
+};
+
+export type SaveListingResult = ListingAnswer<
+  | { kind: 'ok'; listing: Listing }
+  | { kind: 'invalid'; fields: string[] } // E-LST-04
+  | { kind: 'afterExpiry' } // E-LST-03
+  | { kind: 'formalVendor' } // Quick Post is for informal vendors only
+>;
+
+async function saveListing(path: string, body: object, token: string): Promise<SaveListingResult> {
+  const result = await protectedCall(path, { method: 'POST', body: JSON.stringify(body) }, token);
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  if (result.status === 201 && data !== null) return { kind: 'ok', listing: data as unknown as Listing };
+  if (result.status === 400 && data?.error === 'E-LST-04' && Array.isArray(data.fields)) {
+    return { kind: 'invalid', fields: data.fields as string[] };
+  }
+  if (result.status === 400 && data?.error === 'E-LST-03') return { kind: 'afterExpiry' };
+  if (result.status === 403 && data?.error === 'quick_post_informal_only') return { kind: 'formalVendor' };
+  return { kind: 'unexpected' };
+}
+
+/** POST /listings: saves a full listing as a Draft (US-10, US-13). */
+export function createListing(token: string, body: ListingRequest): Promise<SaveListingResult> {
+  return saveListing('/listings', body, token);
+}
+
+/** POST /listings/quick: a Quick Post, published at once (US-11). */
+export function createQuickPost(token: string, body: QuickPostRequest): Promise<SaveListingResult> {
+  return saveListing('/listings/quick', body, token);
+}
+
+/** GET /listings/:id: the vendor's own listing. */
+export async function getListing(
+  token: string,
+  id: string,
+): Promise<ListingAnswer<{ kind: 'ok'; listing: Listing } | { kind: 'notFound' }>> {
+  const result = await protectedCall(`/listings/${encodeURIComponent(id)}`, {}, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
+}
+
+/** POST /listings/:id/publish: Draft → Active. */
+export async function publishListing(
+  token: string,
+  id: string,
+): Promise<ListingAnswer<{ kind: 'ok'; listing: Listing } | { kind: 'notDraft' }>> {
+  const result = await protectedCall(
+    `/listings/${encodeURIComponent(id)}/publish`,
+    { method: 'POST' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  if (result.status === 409) return { kind: 'notDraft' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
 }

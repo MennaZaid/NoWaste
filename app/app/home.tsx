@@ -10,6 +10,7 @@ import { AppText } from '@/components/AppText';
 import { ApplicationsList } from '@/components/ApplicationsList';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { VendorHome } from '@/components/VendorHome';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { colors, spacing } from '@/theme';
 
@@ -84,7 +85,7 @@ export default function HomeScreen() {
   return (
     <Screen scroll>
       <View testID={`home-${group}`} style={box}>
-        <AppText>{t(`home.${group}`)}</AppText>
+        {group === 'vendor' ? <VendorHome /> : <AppText>{t(`home.${group}`)}</AppText>}
       </View>
     </Screen>
   );

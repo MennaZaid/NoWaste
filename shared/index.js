@@ -238,6 +238,120 @@ function validateSignUp(input) {
   return { ok: true, value };
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Listings (US-10, US-11, US-13). Sprint 1 has no AI, so the vendor types every field (E-LST-01 manual path).
+
+// NFR-08a: a listing photo is at most 500 KB (500 × 1024 bytes) when it is uploaded. The server reads the same value
+// from the settings row NFR-08a (a server test checks that both match); the app compresses photos to fit.
+const PHOTO_MAX_BYTES = 500 * 1024;
+
+/** "Unknown" for the food category, preparation time, storage and expiry (FR-LST-04, SDD 4.2 Listing). */
+const UNKNOWN = 'unknown';
+const STORAGE_CONDITIONS = Object.freeze(['room_temperature', 'chilled', 'frozen', UNKNOWN]);
+const LISTING_FOOD_CATEGORIES = Object.freeze([...FOOD_CATEGORIES, UNKNOWN]);
+
+/** A date and time the app sends in ISO 8601 form, for example 2026-11-01T10:00:00.000Z. */
+function parseTime(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value)) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function isWholeNumberFrom(value, min) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min;
+}
+
+function isPositiveAmount(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/** An optional pickup location {latitude, longitude}; missing means the shop pin. */
+function readLocation(value) {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  const { latitude, longitude } = asObject(value);
+  return isNumberBetween(latitude, -90, 90) && isNumberBetween(longitude, -180, 180)
+    ? { ok: true, value: { latitude, longitude } }
+    : { ok: false };
+}
+
+/**
+ * Checks a full listing (FR-LST-01, FR-LST-04). Returns every invalid field as E-LST-04; when the fields are valid
+ * but the pickup window ends after the expiry, returns E-LST-03 for pickupEnd (NFR-05c: ending exactly at the
+ * expiry is allowed). A price of 0 is refused for now (open question 24).
+ */
+function validateListing(input) {
+  const fields = [];
+  if (!isFilledText(input.photoKey, 200)) fields.push('photoKey');
+  if (!isFilledText(input.foodType, TEXT_LIMITS.name)) fields.push('foodType');
+  if (!LISTING_FOOD_CATEGORIES.includes(input.foodCategory)) fields.push('foodCategory');
+  if (!isFilledText(input.descriptionAr, TEXT_LIMITS.description)) fields.push('descriptionAr');
+  if (!isFilledText(input.descriptionEn, TEXT_LIMITS.description)) fields.push('descriptionEn');
+  if (!isWholeNumberFrom(input.bagsTotal, 1)) fields.push('bagsTotal');
+  const originalOk = isPositiveAmount(input.originalValue);
+  if (!originalOk) fields.push('originalValue');
+  // E-LST-04: the discounted price may not be higher than the original value.
+  if (!isPositiveAmount(input.price) || (originalOk && input.price > input.originalValue))
+    fields.push('price');
+  const start = parseTime(input.pickupStart);
+  if (start === null) fields.push('pickupStart');
+  const end = parseTime(input.pickupEnd);
+  if (end === null || (start !== null && end <= start)) fields.push('pickupEnd');
+  const prep = parseTime(input.prepTime);
+  if (input.prepTime !== UNKNOWN && prep === null) fields.push('prepTime');
+  if (!STORAGE_CONDITIONS.includes(input.storage)) fields.push('storage');
+  const expiry = parseTime(input.expiryAt);
+  if (input.expiryAt !== UNKNOWN && expiry === null) fields.push('expiryAt');
+  const location = readLocation(input.location);
+  if (!location.ok) fields.push('location');
+
+  if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
+  if (expiry !== null && end > expiry) return { ok: false, error: 'E-LST-03', field: 'pickupEnd' };
+
+  return {
+    ok: true,
+    value: {
+      photoKey: input.photoKey.trim(),
+      foodType: input.foodType.trim(),
+      foodCategory: input.foodCategory,
+      descriptionAr: input.descriptionAr.trim(),
+      descriptionEn: input.descriptionEn.trim(),
+      bagsTotal: input.bagsTotal,
+      originalValue: input.originalValue,
+      price: input.price,
+      pickupStart: new Date(start).toISOString(),
+      pickupEnd: new Date(end).toISOString(),
+      prepTime: prep === null ? null : new Date(prep).toISOString(),
+      storage: input.storage,
+      expiryAt: expiry === null ? null : new Date(expiry).toISOString(),
+      location: location.value,
+    },
+  };
+}
+
+/**
+ * Checks a Quick Post (FR-LST-02): only a photo, the number of bags, the price and the pickup end time. The pickup
+ * starts at the time of posting (`now`, decision D-43), so the end must be after it.
+ */
+function validateQuickPost(input, now) {
+  const fields = [];
+  if (!isFilledText(input.photoKey, 200)) fields.push('photoKey');
+  if (!isWholeNumberFrom(input.bagsTotal, 1)) fields.push('bagsTotal');
+  if (!isPositiveAmount(input.price)) fields.push('price');
+  const end = parseTime(input.pickupEnd);
+  if (end === null || end <= now.getTime()) fields.push('pickupEnd');
+  if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
+  return {
+    ok: true,
+    value: {
+      photoKey: input.photoKey.trim(),
+      bagsTotal: input.bagsTotal,
+      price: input.price,
+      pickupStart: now.toISOString(),
+      pickupEnd: new Date(end).toISOString(),
+    },
+  };
+}
+
 module.exports = {
   PASSWORD_RULES,
   LANGUAGES,
@@ -256,4 +370,10 @@ module.exports = {
   normalizeEgyptianPhone,
   validateRegistration,
   validateSignUp,
+  PHOTO_MAX_BYTES,
+  UNKNOWN,
+  STORAGE_CONDITIONS,
+  LISTING_FOOD_CATEGORIES,
+  validateListing,
+  validateQuickPost,
 };

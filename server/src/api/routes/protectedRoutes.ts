@@ -6,6 +6,14 @@ import { ROLE_GROUPS, type RoleGroup } from '../../domain/roles.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { decideHandler, listApplicationsHandler } from './admin.js';
 import { logoutHandler } from './auth.js';
+import {
+  createListingHandler,
+  createQuickPostHandler,
+  getListingHandler,
+  getShopHandler,
+  publishListingHandler,
+  uploadPhotoHandler,
+} from './listings.js';
 import { getMeHandler, patchMeHandler } from './users.js';
 
 export interface ProtectedRoute {
@@ -14,8 +22,12 @@ export interface ProtectedRoute {
   roles: readonly RoleGroup[];
   /** E-ACC-05: only Approved vendors and partners (posting or receiving food). */
   approvedOnly?: boolean;
+  notApprovedError?: 'E-ACC-05' | 'E-LST-06';
   handler: RequestHandler;
 }
+
+// E-LST-06: a vendor whose account is not Approved may not create or publish a listing.
+const APPROVED_VENDOR = { roles: ['vendor'], approvedOnly: true, notApprovedError: 'E-LST-06' } as const;
 
 const EVERYONE = ROLE_GROUPS;
 
@@ -36,6 +48,13 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
     roles: ['admin'],
     handler: decideHandler('reject'),
   },
+  // US-10, US-11, US-13 (SDD C-05).
+  { method: 'get', path: '/vendors/me', roles: ['vendor'], handler: getShopHandler },
+  { method: 'post', path: '/listings/photo', ...APPROVED_VENDOR, handler: uploadPhotoHandler },
+  { method: 'post', path: '/listings/quick', ...APPROVED_VENDOR, handler: createQuickPostHandler },
+  { method: 'post', path: '/listings', ...APPROVED_VENDOR, handler: createListingHandler },
+  { method: 'get', path: '/listings/:id', roles: ['vendor'], handler: getListingHandler },
+  { method: 'post', path: '/listings/:id/publish', ...APPROVED_VENDOR, handler: publishListingHandler },
 ];
 
 export function mountProtectedRoutes(

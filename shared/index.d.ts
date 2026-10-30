@@ -124,3 +124,87 @@ export declare function validateSignUp(input: SignUpInput): SignUpValidation;
 
 /** FR-ACC-04: an email address or an Egyptian mobile number (returned in +20 form), or null. */
 export declare function parseLoginIdentifier(value: unknown): { email: string } | { phone: string } | null;
+
+// Listings (US-10, US-11, US-13).
+export declare const PHOTO_MAX_BYTES: number;
+export declare const UNKNOWN: 'unknown';
+export type Unknown = 'unknown';
+export type StorageCondition = 'room_temperature' | 'chilled' | 'frozen' | Unknown;
+export type ListingFoodCategory = FoodCategory | Unknown;
+export declare const STORAGE_CONDITIONS: readonly StorageCondition[];
+export declare const LISTING_FOOD_CATEGORIES: readonly ListingFoodCategory[];
+
+export type ListingField =
+  | 'photoKey'
+  | 'foodType'
+  | 'foodCategory'
+  | 'descriptionAr'
+  | 'descriptionEn'
+  | 'bagsTotal'
+  | 'originalValue'
+  | 'price'
+  | 'pickupStart'
+  | 'pickupEnd'
+  | 'prepTime'
+  | 'storage'
+  | 'expiryAt'
+  | 'location';
+
+export interface ListingInput {
+  photoKey?: unknown;
+  foodType?: unknown;
+  foodCategory?: unknown;
+  descriptionAr?: unknown;
+  descriptionEn?: unknown;
+  bagsTotal?: unknown;
+  originalValue?: unknown;
+  price?: unknown;
+  pickupStart?: unknown;
+  pickupEnd?: unknown;
+  prepTime?: unknown;
+  storage?: unknown;
+  expiryAt?: unknown;
+  location?: unknown;
+}
+
+export interface ValidListing {
+  photoKey: string;
+  foodType: string;
+  foodCategory: ListingFoodCategory;
+  descriptionAr: string;
+  descriptionEn: string;
+  bagsTotal: number;
+  originalValue: number;
+  price: number;
+  pickupStart: string;
+  pickupEnd: string;
+  /** null = Unknown. */
+  prepTime: string | null;
+  storage: StorageCondition;
+  /** null = Unknown. */
+  expiryAt: string | null;
+  /** null = the shop pin. */
+  location: { latitude: number; longitude: number } | null;
+}
+
+export type ListingValidation =
+  | { ok: true; value: ValidListing }
+  | { ok: false; error: 'E-LST-04'; fields: ListingField[] }
+  | { ok: false; error: 'E-LST-03'; field: 'pickupEnd' };
+
+export declare function validateListing(input: ListingInput): ListingValidation;
+
+export type QuickPostField = 'photoKey' | 'bagsTotal' | 'price' | 'pickupEnd';
+
+export interface ValidQuickPost {
+  photoKey: string;
+  bagsTotal: number;
+  price: number;
+  pickupStart: string;
+  pickupEnd: string;
+}
+
+export declare function validateQuickPost(
+  input: { photoKey?: unknown; bagsTotal?: unknown; price?: unknown; pickupEnd?: unknown },
+  now: Date,
+): { ok: true; value: ValidQuickPost } | { ok: false; error: 'E-LST-04'; fields: QuickPostField[] };

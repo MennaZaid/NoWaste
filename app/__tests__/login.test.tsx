@@ -9,6 +9,8 @@ import { renderApp } from './helpers/renderApp';
 import { headerDirections, headerSlotContents } from './helpers/headerDirection';
 
 jest.mock('@/api/client', () => ({
+  // The vendor home asks for the shop (US-10); these tests only check which home opens.
+  getShop: jest.fn().mockResolvedValue({ kind: 'unexpected' }),
   isServerHealthy: jest.fn().mockResolvedValue(true),
   registerConsumer: jest.fn(),
   login: jest.fn(),

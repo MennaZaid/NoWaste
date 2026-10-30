@@ -19,6 +19,8 @@ export function authOf(res: Response): Authenticated {
 export interface RoleOptions {
   /** E-ACC-05: posting or receiving food needs an Approved vendor or partner. */
   approvedOnly?: boolean;
+  /** The error ID for a vendor or partner that is not Approved: E-ACC-05 by default, E-LST-06 for listings. */
+  notApprovedError?: 'E-ACC-05' | 'E-LST-06';
 }
 
 export function requireRole(roles: readonly RoleGroup[], options: RoleOptions = {}): RequestHandler {
@@ -29,7 +31,7 @@ export function requireRole(roles: readonly RoleGroup[], options: RoleOptions = 
     const group = roleGroupOf(user.role);
     if (!roles.includes(group)) throw new SrsError(403, { error: 'forbidden' });
     if (options.approvedOnly && (group === 'vendor' || group === 'partner') && user.status !== 'Approved') {
-      throw new SrsError(403, { error: 'E-ACC-05' });
+      throw new SrsError(403, { error: options.notApprovedError ?? 'E-ACC-05' });
     }
     next();
   };

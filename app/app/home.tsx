@@ -4,15 +4,20 @@
 // E-ACC-06: a Suspended account sees that it is suspended. The administrator home lists Pending applications (US-07).
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
+import type { Edge } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { roleGroupOf, useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { ApplicationsList } from '@/components/ApplicationsList';
 import { Notice } from '@/components/Notice';
+import { HomeHeader } from '@/components/HomeHeader';
 import { Screen } from '@/components/Screen';
 import { VendorHome } from '@/components/VendorHome';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { colors, spacing } from '@/theme';
+
+// No navigation header on this screen (D-53): it pads the top safe area and draws HomeHeader itself.
+const EDGES: Edge[] = ['top', 'bottom'];
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -23,7 +28,7 @@ export default function HomeScreen() {
 
   if (phase === 'restoring') {
     return (
-      <Screen contentStyle={styles.center}>
+      <Screen contentStyle={styles.center} edges={EDGES}>
         <ActivityIndicator color={colors.primary} />
       </Screen>
     );
@@ -34,7 +39,7 @@ export default function HomeScreen() {
 
   if (suspended || user?.status === 'Suspended' || user === null) {
     return (
-      <Screen scroll>
+      <Screen scroll edges={EDGES} header={<HomeHeader />}>
         <View testID="home-suspended" style={box}>
           <AppText variant="heading" accessibilityRole="header">
             {t('home.suspendedTitle')}
@@ -49,7 +54,7 @@ export default function HomeScreen() {
 
   if ((group === 'vendor' || group === 'partner') && user.status !== 'Approved') {
     return (
-      <Screen scroll>
+      <Screen scroll edges={EDGES} header={<HomeHeader />}>
         <View testID="home-application-status" style={box}>
           <AppText variant="heading" accessibilityRole="header">
             {t('home.applicationTitle')}
@@ -68,7 +73,7 @@ export default function HomeScreen() {
 
   if (group === 'admin') {
     return (
-      <Screen scroll>
+      <Screen scroll edges={EDGES} header={<HomeHeader />}>
         <View testID="home-admin" style={box}>
           <AppText variant="heading" accessibilityRole="header">
             {t('admin.pendingTitle')}
@@ -83,7 +88,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll edges={EDGES} header={<HomeHeader />}>
       <View testID={`home-${group}`} style={box}>
         {group === 'vendor' ? <VendorHome /> : <AppText>{t(`home.${group}`)}</AppText>}
       </View>

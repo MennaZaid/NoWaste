@@ -12,6 +12,7 @@ import {
   activateDraft,
   findShopDetails,
   findVendorListing,
+  findVendorListings,
   insertListing,
   type ListingRecord,
   type ShopDetails,
@@ -219,6 +220,24 @@ async function ownListing(vendorId: string, id: string): Promise<ListingRecord> 
 /** GET /listings/:id: only the vendor's own listing. */
 export async function getListing(vendorId: string, id: string): Promise<ListingView> {
   return toView(await ownListing(vendorId, id));
+}
+
+/**
+ * GET /listings (US-15, FR-LST-06): the vendor's active and previous listings, newest first. Reservations are added
+ * to this view when they exist (Sprint 2).
+ */
+export async function getMyListings(vendorId: string): Promise<ListingView[]> {
+  return (await findVendorListings(vendorId)).map(toView);
+}
+
+/** GET /listings/:id/photo: the photo of the vendor's own listing (C-26). */
+export async function getListingPhoto(
+  vendorId: string,
+  id: string,
+): Promise<{ data: Buffer; type: PhotoType }> {
+  const photo = await getStorage().read((await ownListing(vendorId, id)).photoKey);
+  if (photo === undefined) throw new SrsError(404, { error: 'not_found' });
+  return photo;
 }
 
 /**

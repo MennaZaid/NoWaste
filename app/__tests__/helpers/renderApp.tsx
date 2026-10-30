@@ -11,6 +11,7 @@ import ApplicationScreen from '../../app/admin/[userId]';
 import NewListingScreen from '../../app/listings/new';
 import QuickPostScreen from '../../app/listings/quick';
 import ListingScreen from '../../app/listings/[id]';
+import MyListingsScreen from '../../app/listings/index';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -26,6 +27,7 @@ export function renderApp(initialUrl = '/') {
       'listings/new': NewListingScreen,
       'listings/quick': QuickPostScreen,
       'listings/[id]': ListingScreen,
+      'listings/index': MyListingsScreen,
     },
     { initialUrl },
   );

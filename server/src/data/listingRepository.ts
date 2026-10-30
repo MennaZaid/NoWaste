@@ -112,6 +112,15 @@ export async function findVendorListing(vendorId: string, id: string): Promise<L
   return result.rows[0];
 }
 
+/** Every listing of this vendor, newest first (FR-LST-06). */
+export async function findVendorListings(vendorId: string): Promise<ListingRecord[]> {
+  const result = await getPool().query<ListingRecord>(
+    `SELECT ${columns} FROM listings WHERE vendor_id = $1 ORDER BY created_at DESC, id`,
+    [vendorId],
+  );
+  return result.rows;
+}
+
 /** Moves a Draft to Active. Returns undefined when the listing is no longer a Draft. */
 export async function activateDraft(vendorId: string, id: string): Promise<ListingRecord | undefined> {
   const result = await getPool().query<ListingRecord>(

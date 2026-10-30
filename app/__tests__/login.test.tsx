@@ -2,7 +2,7 @@
 // mocked; the token is kept in expo-secure-store (an in-memory mock in jest.setup.ts).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { fireEvent, screen, waitFor } from 'expo-router/testing-library';
+import { fireEvent, screen, waitFor, within } from 'expo-router/testing-library';
 import { getMe, login, logout, updateMyLanguage, type SessionUser } from '@/api/client';
 import { TOKEN_KEY } from '@/auth/tokenStorage';
 import { renderApp } from './helpers/renderApp';
@@ -331,28 +331,95 @@ describe('NFR-06 the Log in screen in Arabic', () => {
   });
 });
 
-describe('IF-UI-02 the header after logging in (decision D-42)', () => {
+// D-42 layout, drawn by the home screen itself since D-53: on the phone in Arabic the native header lost its start
+// slot (logo and Log out) and cut off the switch, so the home screen no longer uses the native header.
+describe('IF-UI-02 the home header after logging in (decisions D-42, D-53)', () => {
   test('IF-UI-02 the home header starts with the logo and Log out beside it, and ends with the language switch', async () => {
     mockedLogin.mockResolvedValue({ kind: 'ok', token: 't-header', user: user() });
     await openLogin();
     await logInWith('mona@example.com');
     await screen.findByTestId('home-consumer');
 
-    const slots = headerSlotContents().filter(
-      (s) => s.items.includes('home-header-start') || s.items.includes('language-switch'),
-    );
-    const start = slots.find((s) => s.items.includes('home-header-start'));
-    const end = slots.find(
-      (s) => s.items.includes('language-switch') && !s.items.includes('home-header-start'),
-    );
-    // Start slot ("left" in English): the logo first, then Log out right beside it. No title text.
-    expect(start?.slot).toBe('left');
-    expect(start?.items.filter((i) => i === 'image:NoWaste logo' || i === 'header-logout')).toEqual([
-      'image:NoWaste logo',
-      'header-logout',
-    ]);
-    // End slot ("right" in English): only the language switch.
-    expect(end?.slot).toBe('right');
-    expect(end?.items).not.toContain('header-logout');
+    const bar = screen.getByTestId('home-header');
+    const [start, end] = bar.children as ReturnType<typeof screen.getByTestId>[];
+    expect(start?.props.testID).toBe('home-header-start');
+    expect(within(start!).getByLabelText('NoWaste logo')).toBeOnTheScreen();
+    expect(within(start!).getByRole('button', { name: 'Log out' })).toBeOnTheScreen();
+    expect(end?.props.testID).toBe('language-switch');
+    // One language switch only: the native header is not shown on the home screen.
+    expect(screen.getAllByTestId('language-switch')).toHaveLength(1);
+    expect(headerSlotContents().flatMap((s) => s.items)).not.toContain('header-logout');
   });
+
+  test.each([
+    ['consumer', 'Active', 'home-consumer'],
+    ['vendor', 'Approved', 'home-vendor'],
+    ['charity', 'Rejected', 'home-application-status'],
+    ['admin', 'Active', 'home-admin'],
+  ] as const)(
+    'NFR-06 IF-UI-02 in Arabic the %s home header shows the logo and Log out and reads right to left',
+    async (role, status, home) => {
+      await AsyncStorage.setItem('nowaste.language', 'ar');
+      store.set(TOKEN_KEY, `saved-${role}`);
+      mockedGetMe.mockResolvedValue({ kind: 'ok', user: user({ role, status, language: 'ar' }) });
+      await renderApp('/');
+      await screen.findByTestId(home);
+
+      const bar = screen.getByTestId('home-header');
+      expect(bar).toHaveStyle({ direction: 'rtl', flexDirection: 'row' });
+      const start = within(bar).getByTestId('home-header-start');
+      expect(within(start).getByLabelText('شعار NoWaste')).toBeOnTheScreen();
+      expect(within(start).getByRole('button', { name: 'تسجيل الخروج' })).toBeOnTheScreen();
+      expect(within(bar).getByTestId('language-switch')).toBeOnTheScreen();
+    },
+  );
+});
+
+// Phone testing (2026-10-31): in Arabic, Log out sometimes disappeared from the header, because the wider Arabic text
+// "تسجيل الخروج" plus the language switch (and the title on other screens) did not fit, and Android cut it off.
+// Log out is now an icon button of one fixed size in both languages (decision D-52).
+describe('IF-UI-02 NFR-06 Log out always fits in the header (decision D-52)', () => {
+  test('IF-UI-02 Log out in the header is an icon with no text, the same fixed size in English and in Arabic', async () => {
+    mockedLogin.mockResolvedValue({ kind: 'ok', token: 't-icon', user: user() });
+    await openLogin();
+    await logInWith('mona@example.com');
+    await screen.findByTestId('home-consumer');
+
+    expect(screen.getByRole('button', { name: 'Log out' })).toHaveStyle({ width: 48, height: 48 });
+    expect(screen.queryByText('Log out')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'العربية' }));
+
+    const arabic = await screen.findByRole('button', { name: 'تسجيل الخروج' });
+    expect(arabic).toHaveStyle({ width: 48, height: 48 });
+    expect(arabic).toHaveProp('accessibilityHint', 'ينهي جلستك على هذا الهاتف');
+    expect(screen.queryByText('تسجيل الخروج')).toBeNull();
+  });
+
+  test.each([
+    ['vendor', 'Approved', 'home-vendor'],
+    ['admin', 'Active', 'home-admin'],
+  ] as const)(
+    'FR-ACC-04 NFR-06 a %s who logs in in Arabic can log out from the header',
+    async (role, status, home) => {
+      await AsyncStorage.setItem('nowaste.language', 'ar');
+      mockedLogin.mockResolvedValue({ kind: 'ok', token: `t-${role}`, user: user({ role, status }) });
+      const app = await renderApp('/login');
+      await fireEvent.changeText(
+        await screen.findByLabelText('البريد الإلكتروني أو رقم المحمول'),
+        'mona@example.com',
+      );
+      await fireEvent.changeText(screen.getByLabelText('كلمة المرور'), 'abcd1234');
+      await fireEvent.press(screen.getByRole('button', { name: 'تسجيل الدخول' }));
+      await screen.findByTestId(home);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'تسجيل الخروج' }));
+
+      await waitFor(() => {
+        expect(app.getPathname()).toBe('/');
+      });
+      expect(mockedLogout).toHaveBeenCalledWith(`t-${role}`);
+      expect(store.size).toBe(0);
+    },
+  );
 });

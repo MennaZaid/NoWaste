@@ -6,6 +6,8 @@ import {
   createListing,
   createQuickPost,
   getListing,
+  getListingPhoto,
+  getMyListings,
   getShop,
   publishListing,
   uploadPhoto,
@@ -68,6 +70,17 @@ export const createQuickPostHandler: RequestHandler = async (req, res) => {
 
 export const getListingHandler: RequestHandler = async (req, res) => {
   res.json(await getListing(authOf(res).user.id, String(req.params.id)));
+};
+
+/** GET /listings: the vendor's own listings, newest first (US-15, FR-LST-06). */
+export const getMyListingsHandler: RequestHandler = async (_req, res) => {
+  res.json(await getMyListings(authOf(res).user.id));
+};
+
+/** GET /listings/:id/photo: the photo file of the vendor's own listing. */
+export const getListingPhotoHandler: RequestHandler = async (req, res) => {
+  const photo = await getListingPhoto(authOf(res).user.id, String(req.params.id));
+  res.type(photo.type).send(photo.data);
 };
 
 export const publishListingHandler: RequestHandler = async (req, res) => {

@@ -1,4 +1,5 @@
-// The vendor's listing after saving (US-10, US-11): its details and status. A Draft can be published here
+// The vendor's listing after saving (US-10, US-11) or from My listings (US-15): its photo, details and status (D-51).
+// A Draft can be published here
 // (Draft → Active). Turn 5 adds the perishability confirmation (US-18) and the destination (US-19) before this step.
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -8,11 +9,12 @@ import { getListing, publishListing, type Listing } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { ListingPhoto } from '@/components/ListingPhoto';
 import { formatDateTime } from '@/listings/formatDateTime';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { useLanguage } from '@/i18n/LanguageProvider';
-import { colors, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
 type Problem = 'notApproved' | 'notDraft' | 'unreachable' | 'unexpected' | 'notFound';
 
@@ -96,6 +98,12 @@ export default function ListingScreen() {
               <Notice tone="info" message={t('listing.published')} />
             ) : null}
             {listing.isQuickPost ? <Notice tone="info" message={t('quickPost.highlyPerishable')} /> : null}
+            <ListingPhoto
+              testID="listing-photo"
+              token={session}
+              listingId={listing.id}
+              style={styles.photo}
+            />
             <Row label={t('listing.foodTypeLabel')} value={listing.foodType ?? t('quickPost.title')} />
             <Row
               label={t('listing.categoryLabel')}
@@ -155,5 +163,11 @@ const styles = StyleSheet.create({
   },
   row: {
     gap: 2,
+  },
+  photo: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
   },
 });

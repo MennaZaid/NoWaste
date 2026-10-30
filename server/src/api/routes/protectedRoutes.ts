@@ -10,6 +10,8 @@ import {
   createListingHandler,
   createQuickPostHandler,
   getListingHandler,
+  getListingPhotoHandler,
+  getMyListingsHandler,
   getShopHandler,
   publishListingHandler,
   uploadPhotoHandler,
@@ -54,6 +56,9 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   { method: 'post', path: '/listings/quick', ...APPROVED_VENDOR, handler: createQuickPostHandler },
   { method: 'post', path: '/listings', ...APPROVED_VENDOR, handler: createListingHandler },
   { method: 'get', path: '/listings/:id', roles: ['vendor'], handler: getListingHandler },
+  // US-15 (FR-LST-06) and the listing photo: a vendor sees only their own listings.
+  { method: 'get', path: '/listings', roles: ['vendor'], handler: getMyListingsHandler },
+  { method: 'get', path: '/listings/:id/photo', roles: ['vendor'], handler: getListingPhotoHandler },
   { method: 'post', path: '/listings/:id/publish', ...APPROVED_VENDOR, handler: publishListingHandler },
 ];
 

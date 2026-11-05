@@ -1,9 +1,11 @@
-// Create listing (US-10, FR-LST-01) with preparation time, storage and expiry (US-13, FR-LST-04). Sprint 1 has no AI,
-// so the vendor types the food type, category and both descriptions (the manual path of E-LST-01 and NFR-03); the
-// AI draft (US-12) fills the same fields in Sprint 2. The pickup location starts at the shop pin and can be moved
-// (docs/feedback-changes.md). Saving compresses and uploads the photo (NFR-08a, C-26); if the upload fails the form
-// keeps every value and offers Retry (E-LST-02). Invalid fields are marked (E-LST-04, IF-UI-06) and a pickup end after
-// the expiry is refused (E-LST-03, NFR-05c). The listing is saved as a Draft and published on the next screen.
+// Create listing (US-10, FR-LST-01, US-13 / FR-LST-04 as changed by D-63 and D-64), for formal vendors only. The vendor
+// writes the name and description once, in Arabic or English; they are shown as written, not translated (D-66). The number of bags is
+// a +/− counter, storage is a drop-down, and the vendor picks the pickup start and one of their branches. Preparation
+// time and expiry are no longer asked: the pick-by time is worked out by the server (pickup start + the shelf-life of
+// the food category and storage, or + 6 h when unknown, never after the branch's closing time) and shown here as an
+// Estimate before saving (NFR-05a). Saving compresses and uploads the photo (NFR-08a, C-26); if the upload fails the
+// form keeps every value and offers Retry (E-LST-02). Invalid fields are marked (E-LST-04, IF-UI-06). The listing is
+// saved as a Draft and published on the next screen.
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
@@ -17,53 +19,77 @@ import {
   type ListingFoodCategory,
   type StorageCondition,
 } from '@nowaste/shared';
-import { createListing, getShop, type ListingRequest } from '@/api/client';
+import {
+  createListing,
+  getShop,
+  previewPickBy,
+  type Branch,
+  type ListingRequest,
+  type PickByPreview,
+} from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { CounterField } from '@/components/CounterField';
 import { DateTimeField } from '@/components/DateTimeField';
-import { MapView, type Coordinates } from '@/components/MapView';
 import { Notice } from '@/components/Notice';
 import { OptionList } from '@/components/OptionList';
 import { PhotoPicker } from '@/components/PhotoPicker';
 import { Screen } from '@/components/Screen';
+import { SelectField } from '@/components/SelectField';
 import { TextField } from '@/components/TextField';
 import { useLanguage } from '@/i18n/LanguageProvider';
-import { parseAmount, preparePhoto } from '@/listings/formHelpers';
+import { useCategoryHours } from '@/listings/categoryHours';
+import { formatDateTime } from '@/listings/formatDateTime';
+import { categoryWithHours } from '@/listings/perishabilityText';
+import { textLanguageOf } from '@/listings/listingText';
+import { parseAmount, pickupNoteFor, preparePhoto, type PickupNote } from '@/listings/formHelpers';
 import { spacing } from '@/theme';
 
-type Problem = 'uploadFailed' | 'tooLarge' | 'notApproved' | 'unreachable' | 'unexpected';
+type Problem =
+  | 'uploadFailed'
+  | 'tooLarge'
+  | 'notApproved'
+  | 'unreachable'
+  | 'unexpected'
+  | 'hoursRequired'
+  | 'informalVendor';
 
 const CATEGORIES: readonly ListingFoodCategory[] = [...FOOD_CATEGORIES, UNKNOWN];
+
+/** The preview answer, kept with the inputs it was asked for so an old answer is never shown for new inputs. */
+interface Preview {
+  key: string;
+  result: PickByPreview | null;
+}
 
 export default function NewListingScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const { token, signOut } = useAuth();
+  const hours = useCategoryHours();
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   // Kept after a successful upload, so Retry and a second save do not upload again.
   const [photoKey, setPhotoKey] = useState<string | null>(null);
-  const [foodType, setFoodType] = useState('');
-  const [foodCategory, setFoodCategory] = useState<ListingFoodCategory | null>(null);
-  const [descriptionAr, setDescriptionAr] = useState('');
-  const [descriptionEn, setDescriptionEn] = useState('');
-  const [bags, setBags] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [bags, setBags] = useState(1);
   const [originalValue, setOriginalValue] = useState('');
   const [price, setPrice] = useState('');
   const [pickupStart, setPickupStart] = useState<string | null>(null);
+  // D-69: an earlier end the vendor chose; null = the worked-out latest end.
   const [pickupEnd, setPickupEnd] = useState<string | null>(null);
-  const [prepTime, setPrepTime] = useState<string | null>(null);
-  const [prepUnknown, setPrepUnknown] = useState(false);
+  const [foodCategory, setFoodCategory] = useState<ListingFoodCategory | null>(null);
   const [storage, setStorage] = useState<StorageCondition | null>(null);
-  const [expiryAt, setExpiryAt] = useState<string | null>(null);
-  const [expiryUnknown, setExpiryUnknown] = useState(false);
-  const [shopPin, setShopPin] = useState<Coordinates | null>(null);
-  const [pin, setPin] = useState<Coordinates | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchId, setBranchId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
 
   const [invalid, setInvalid] = useState<ListingField[]>([]);
-  const [afterExpiry, setAfterExpiry] = useState(false);
+  // D-62: a message from the server for the pickup start (the branch is closed then).
+  const [pickupNote, setPickupNote] = useState<PickupNote | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -73,9 +99,10 @@ export default function NewListingScreen() {
     void getShop(token)
       .then((result) => {
         if (active && result.kind === 'ok') {
-          const here = { latitude: result.shop.latitude, longitude: result.shop.longitude };
-          setShopPin(here);
-          setPin((current) => current ?? here);
+          setBranches(result.shop.branches);
+          // With one branch there is nothing to choose.
+          const only = result.shop.branches.length === 1 ? result.shop.branches[0] : undefined;
+          if (only !== undefined) setBranchId((current) => current ?? only.id);
         }
       })
       .catch(() => undefined);
@@ -84,8 +111,32 @@ export default function NewListingScreen() {
     };
   }, [token]);
 
+  // D-64: the pick-by time for the chosen food, start and branch, as the server will save it.
+  const previewKey =
+    foodCategory !== null && storage !== null && pickupStart !== null && branchId !== null
+      ? [foodCategory, storage, pickupStart, branchId].join('|')
+      : null;
+  useEffect(() => {
+    if (token === null || previewKey === null || foodCategory === null || storage === null) return;
+    if (pickupStart === null || branchId === null) return;
+    let active = true;
+    void previewPickBy(token, { foodCategory, storage, pickupStart, branchId })
+      .then((result) => {
+        if (!active) return;
+        setPreview({ key: previewKey, result: result.kind === 'ok' ? result.preview : null });
+        if (result.kind === 'invalid' && result.hours !== undefined) {
+          setPickupNote({ field: 'pickupStart', message: t('listing.errors.outsideHours', result.hours) });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [token, previewKey, foodCategory, storage, pickupStart, branchId, t]);
+
   if (token === null) return <Redirect href="/" />;
   const session = token;
+  const shownPreview = preview !== null && preview.key === previewKey ? preview.result : null;
 
   function clear(...fields: ListingField[]) {
     setInvalid((current) => current.filter((f) => !fields.includes(f)));
@@ -95,40 +146,38 @@ export default function NewListingScreen() {
   const err = (field: ListingField, key: string) => (invalid.includes(field) ? t(key) : undefined);
 
   function body(key: string): ListingRequest {
-    // The pin is sent only when the vendor moved it; otherwise the server uses the shop pin.
-    const moved =
-      pin !== null &&
-      (shopPin === null || pin.latitude !== shopPin.latitude || pin.longitude !== shopPin.longitude);
     return {
       photoKey: key,
-      foodType,
-      foodCategory: foodCategory ?? ('' as ListingFoodCategory),
-      descriptionAr,
-      descriptionEn,
-      bagsTotal: parseAmount(bags),
+      name,
+      description,
+      // D-66: stored as written; the language is read from the text itself.
+      language: textLanguageOf(`${name} ${description}`),
+      foodCategory: foodCategory ?? undefined,
+      storage: storage ?? undefined,
+      bagsTotal: bags,
       originalValue: parseAmount(originalValue),
       price: parseAmount(price),
       pickupStart: pickupStart ?? undefined,
       pickupEnd: pickupEnd ?? undefined,
-      prepTime: prepUnknown ? UNKNOWN : (prepTime ?? undefined),
-      storage: storage ?? undefined,
-      expiryAt: expiryUnknown ? UNKNOWN : (expiryAt ?? undefined),
-      location: moved ? pin : undefined,
+      branchId: branchId ?? undefined,
     };
   }
 
   async function save() {
     setProblem(null);
-    setAfterExpiry(false);
-    // Checked before the upload, so nothing is sent while a field is wrong. A placeholder stands for the photo key.
+    setPickupNote(null);
+    // Checked before the upload, so nothing is sent while a field is wrong. A placeholder stands for the photo key
+    // and, until the branches have loaded, for the branch.
     const check = validateListing(body(photoUri === null ? '' : (photoKey ?? 'photo')));
     if (!check.ok) {
-      if (check.error === 'E-LST-03') {
-        setInvalid([]);
-        setAfterExpiry(true);
-      } else {
-        setInvalid(check.fields);
-      }
+      setInvalid(check.fields);
+      return;
+    }
+    // D-69: not later than the worked-out limit (the server checks it again, E-LST-03).
+    if (pickupEnd !== null && shownPreview !== null && pickupEnd > shownPreview.pickupEnd) {
+      setPickupNote(
+        pickupNoteFor({ kind: 'afterExpiry', latestPickupEnd: shownPreview.pickupEnd }, t, language),
+      );
       return;
     }
     setInvalid([]);
@@ -156,12 +205,16 @@ export default function NewListingScreen() {
         break;
       case 'invalid':
         setInvalid(result.fields as ListingField[]);
+        setPickupNote(pickupNoteFor(result, t, language));
         break;
       case 'afterExpiry':
-        setAfterExpiry(true);
+        // D-69: the chosen end is later than the worked-out limit.
+        setPickupNote(pickupNoteFor(result, t, language));
         break;
+      case 'hoursRequired':
       case 'notApproved':
       case 'unreachable':
+      case 'informalVendor':
         setProblem(result.kind);
         break;
       case 'unauthorized':
@@ -178,7 +231,7 @@ export default function NewListingScreen() {
       <View testID="listing-form" style={[styles.form, { direction }]}>
         <AppText color="textMuted">{t('listing.intro')}</AppText>
 
-        {invalid.length > 0 || afterExpiry ? (
+        {invalid.length > 0 || pickupNote !== null ? (
           <Notice testID="listing-errors" tone="error" title={t('errors.fixFields')} />
         ) : null}
 
@@ -193,65 +246,38 @@ export default function NewListingScreen() {
         />
 
         <TextField
-          testID="listing-food-type"
-          label={t('listing.foodTypeLabel')}
-          placeholder={t('listing.foodTypePlaceholder')}
-          value={foodType}
+          testID="listing-name"
+          label={t('listing.nameLabel')}
+          placeholder={t('listing.namePlaceholder')}
+          value={name}
           onChangeText={(text) => {
-            setFoodType(text);
-            clear('foodType');
+            setName(text);
+            clear('name');
           }}
-          error={err('foodType', 'listing.errors.foodType')}
-        />
-
-        <OptionList<ListingFoodCategory>
-          testID="listing-categories"
-          label={t('listing.categoryLabel')}
-          options={CATEGORIES.map((value) => ({
-            value,
-            label: value === UNKNOWN ? t('listing.unknown') : t(`foodCategories.${value}`),
-          }))}
-          selected={foodCategory === null ? [] : [foodCategory]}
-          onToggle={(value) => {
-            setFoodCategory(value);
-            clear('foodCategory');
-          }}
-          error={err('foodCategory', 'listing.errors.foodCategory')}
-        />
-
-        <TextField
-          testID="listing-description-ar"
-          label={t('listing.descriptionArLabel')}
-          value={descriptionAr}
-          onChangeText={(text) => {
-            setDescriptionAr(text);
-            clear('descriptionAr');
-          }}
-          error={err('descriptionAr', 'listing.errors.descriptionAr')}
-          multiline
+          error={err('name', 'listing.errors.name')}
         />
         <TextField
-          testID="listing-description-en"
-          label={t('listing.descriptionEnLabel')}
-          value={descriptionEn}
+          testID="listing-description"
+          label={t('listing.descriptionLabel')}
+          value={description}
           onChangeText={(text) => {
-            setDescriptionEn(text);
-            clear('descriptionEn');
+            setDescription(text);
+            clear('description');
           }}
-          error={err('descriptionEn', 'listing.errors.descriptionEn')}
+          error={err('description', 'listing.errors.description')}
           multiline
         />
 
-        <TextField
+        <CounterField
           testID="listing-bags"
           label={t('listing.bagsLabel')}
           value={bags}
-          onChangeText={(text) => {
-            setBags(text);
+          min={1}
+          onChange={(value) => {
+            setBags(value);
             clear('bagsTotal');
           }}
           error={err('bagsTotal', 'listing.errors.bags')}
-          keyboardType="number-pad"
         />
         <TextField
           testID="listing-original-value"
@@ -283,106 +309,108 @@ export default function NewListingScreen() {
           value={pickupStart}
           onChange={(iso) => {
             setPickupStart(iso);
-            clear('pickupStart', 'pickupEnd');
+            setPickupNote(null);
+            clear('pickupStart');
           }}
-          error={err('pickupStart', 'listing.errors.pickupStart')}
-        />
-        <DateTimeField
-          testID="listing-pickup-end"
-          label={t('listing.pickupEndLabel')}
-          value={pickupEnd}
-          onChange={(iso) => {
-            setPickupEnd(iso);
-            setAfterExpiry(false);
-            clear('pickupEnd');
-          }}
-          error={afterExpiry ? t('listing.errors.afterExpiry') : err('pickupEnd', 'listing.errors.pickupEnd')}
+          error={
+            pickupNote?.field === 'pickupStart'
+              ? pickupNote.message
+              : err('pickupStart', 'listing.errors.pickupStart')
+          }
         />
 
-        <AppText variant="heading" accessibilityRole="header">
-          {t('listing.safetySection')}
-        </AppText>
-        <AppText variant="caption" color="textMuted">
-          {t('listing.safetyHint')}
-        </AppText>
-
-        <DateTimeField
-          testID="listing-prep-time"
-          label={t('listing.prepTimeLabel')}
-          value={prepTime}
-          disabled={prepUnknown}
-          onChange={(iso) => {
-            setPrepTime(iso);
-            clear('prepTime');
+        <OptionList<ListingFoodCategory>
+          testID="listing-categories"
+          label={t('listing.categoryLabel')}
+          options={CATEGORIES.map((value) => ({
+            value,
+            label: value === UNKNOWN ? t('listing.unknown') : t(`foodCategories.${value}`),
+          }))}
+          selected={foodCategory === null ? [] : [foodCategory]}
+          onToggle={(value) => {
+            setFoodCategory(value);
+            clear('foodCategory');
           }}
-          error={err('prepTime', 'listing.errors.prepTime')}
-        />
-        <OptionList<'unknown'>
-          multiple
-          label={t('listing.prepUnknownGroup')}
-          options={[{ value: 'unknown', label: t('listing.prepUnknown') }]}
-          selected={prepUnknown ? ['unknown'] : []}
-          onToggle={() => {
-            setPrepUnknown((value) => !value);
-            clear('prepTime');
-          }}
+          error={err('foodCategory', 'listing.errors.foodCategory')}
         />
 
-        <OptionList<StorageCondition>
+        <SelectField<StorageCondition>
           testID="listing-storage"
           label={t('listing.storageLabel')}
+          placeholder={t('listing.storagePlaceholder')}
           options={STORAGE_CONDITIONS.map((value) => ({ value, label: t(`listing.storage.${value}`) }))}
-          selected={storage === null ? [] : [storage]}
-          onToggle={(value) => {
+          value={storage}
+          onChange={(value) => {
             setStorage(value);
             clear('storage');
           }}
           error={err('storage', 'listing.errors.storage')}
         />
 
-        <DateTimeField
-          testID="listing-expiry"
-          label={t('listing.expiryLabel')}
-          hint={t('listing.expiryHint')}
-          value={expiryAt}
-          disabled={expiryUnknown}
-          onChange={(iso) => {
-            setExpiryAt(iso);
-            setAfterExpiry(false);
-            clear('expiryAt');
+        <OptionList<string>
+          testID="listing-branches"
+          label={t('listing.branchLabel')}
+          options={branches.map((branch) => ({
+            value: branch.id,
+            // D-69: branches carry the store name, so they are told apart by address.
+            label: branch.address,
+            description:
+              branch.opensAt !== null && branch.closesAt !== null
+                ? t('listing.shopHours', { opensAt: branch.opensAt, closesAt: branch.closesAt })
+                : undefined,
+          }))}
+          selected={branchId === null ? [] : [branchId]}
+          onToggle={(value) => {
+            setBranchId(value);
+            setPickupNote(null);
+            clear('branchId', 'pickupStart');
           }}
-          error={err('expiryAt', 'listing.errors.expiry')}
-        />
-        <OptionList<'unknown'>
-          multiple
-          label={t('listing.expiryUnknownGroup')}
-          options={[{ value: 'unknown', label: t('listing.expiryUnknown') }]}
-          selected={expiryUnknown ? ['unknown'] : []}
-          onToggle={() => {
-            setExpiryUnknown((value) => !value);
-            setAfterExpiry(false);
-            clear('expiryAt');
-          }}
+          error={err('branchId', 'listing.errors.branch')}
         />
 
-        <View style={styles.group}>
-          <AppText variant="label">{t('listing.locationLabel')}</AppText>
-          <AppText variant="caption" color={invalid.includes('location') ? 'error' : 'textMuted'}>
-            {invalid.includes('location') ? t('listing.errors.location') : t('listing.locationHint')}
+        {/* D-74: the window the vendor may use, with the category (and its hours) as the reason. */}
+        <View testID="listing-pick-by" style={styles.group}>
+          <AppText variant="label">{t('listing.pickWindowLabel')}</AppText>
+          <AppText color={shownPreview === null ? 'textMuted' : 'text'}>
+            {shownPreview === null || pickupStart === null
+              ? t('listing.pickByPending')
+              : t('listing.pickWindowValue', {
+                  start: formatDateTime(pickupStart, language),
+                  end: formatDateTime(shownPreview.pickupEnd, language),
+                })}
           </AppText>
-          {shopPin !== null ? (
-            <MapView
-              testID="listing-map"
-              center={shopPin}
-              pin={pin}
-              onPinChange={(next) => {
-                setPin(next);
-                clear('location');
-              }}
-              accessibilityLabel={t('location.mapLabel')}
-            />
+          {shownPreview !== null ? (
+            <AppText testID="listing-pick-by-reason" variant="caption" color="textMuted">
+              {t('listing.pickByReason', { category: categoryWithHours(t, shownPreview.category, hours) })}
+            </AppText>
+          ) : (
+            <AppText variant="caption" color="textMuted">
+              {t('listing.pickByHint')}
+            </AppText>
+          )}
+          {shownPreview?.cappedAtClosing === true ? (
+            <AppText variant="caption" color="textMuted">
+              {t('listing.pickByCapped')}
+            </AppText>
           ) : null}
         </View>
+
+        <DateTimeField
+          testID="listing-pickup-end"
+          label={t('listing.pickupEndLabel')}
+          hint={t('listing.pickupEndHint')}
+          value={pickupEnd ?? shownPreview?.pickupEnd ?? null}
+          onChange={(iso) => {
+            setPickupEnd(iso);
+            setPickupNote(null);
+            clear('pickupEnd');
+          }}
+          error={
+            pickupNote?.field === 'pickupEnd'
+              ? pickupNote.message
+              : err('pickupEnd', 'listing.errors.pickupEnd')
+          }
+        />
 
         {problem !== null ? (
           <Notice testID="listing-problem" tone="error" message={t(`listing.problems.${problem}`)}>

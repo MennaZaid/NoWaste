@@ -9,7 +9,7 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 // the pin to 30.05, 31.25, the way a tap on the real map would.
 jest.mock('@/components/MapView', () => {
   /* eslint-disable @typescript-eslint/no-require-imports */
-  const { Pressable } = require('react-native');
+  const { Pressable, View } = require('react-native');
   const { createElement } = require('react');
   /* eslint-enable @typescript-eslint/no-require-imports */
   return {
@@ -29,6 +29,36 @@ jest.mock('@/components/MapView', () => {
           onPinChange({ latitude: 30.05, longitude: 31.25 });
         },
       }),
+    // D-65: the consumer map is a view with one button per branch pin (testID map-place-<key>); its props are kept
+    // on the view so tests can read the centre and the zoom (radiusKm).
+    OffersMap: ({
+      center,
+      radiusKm,
+      places,
+      onSelectPlace,
+      accessibilityLabel,
+    }: {
+      center: { latitude: number; longitude: number };
+      radiusKm: number;
+      places: { key: string; accessibilityLabel: string }[];
+      onSelectPlace: (key: string) => void;
+      accessibilityLabel: string;
+    }) =>
+      createElement(
+        View,
+        { testID: 'offers-map', accessibilityLabel, center, radiusKm },
+        places.map((place) =>
+          createElement(Pressable, {
+            key: place.key,
+            testID: `map-place-${place.key}`,
+            accessibilityRole: 'button',
+            accessibilityLabel: place.accessibilityLabel,
+            onPress: () => {
+              onSelectPlace(place.key);
+            },
+          }),
+        ),
+      ),
   };
 });
 
@@ -65,6 +95,7 @@ jest.mock('@/components/DateTimeField', () => {
       error,
       disabled,
       testID,
+      emptyText,
     }: {
       label: string;
       value: string | null;
@@ -72,12 +103,45 @@ jest.mock('@/components/DateTimeField', () => {
       error?: string;
       disabled?: boolean;
       testID?: string;
+      emptyText?: string;
     }) =>
       createElement(TextInput, {
         testID,
         accessibilityLabel: label,
         accessibilityHint: error,
         editable: !disabled,
+        placeholder: emptyText,
+        value: value ?? '',
+        onChangeText: onChange,
+      }),
+  };
+});
+
+// D-62 opening hours: the clock picker is native, so tests get a text box with the field's label; typing "HH:MM"
+// stands for picking that time. The error is the hint, like DateTimeField above.
+jest.mock('@/components/TimeField', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { TextInput } = require('react-native');
+  const { createElement } = require('react');
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return {
+    TimeField: ({
+      label,
+      value,
+      onChange,
+      error,
+      testID,
+    }: {
+      label: string;
+      value: string | null;
+      onChange: (time: string) => void;
+      error?: string;
+      testID?: string;
+    }) =>
+      createElement(TextInput, {
+        testID,
+        accessibilityLabel: label,
+        accessibilityHint: error,
         value: value ?? '',
         onChangeText: onChange,
       }),

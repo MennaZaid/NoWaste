@@ -9,6 +9,8 @@ export interface ListOption<T extends string> {
   value: T;
   label: string;
   description?: string;
+  /** Shown but cannot be chosen (for example landfill until US-25). */
+  disabled?: boolean;
 }
 
 interface OptionListProps<T extends string> {
@@ -45,14 +47,20 @@ export function OptionList<T extends string>({
           return (
             <Pressable
               key={option.value}
+              disabled={option.disabled}
               onPress={() => {
                 onToggle(option.value);
               }}
               accessibilityRole={multiple ? 'checkbox' : 'radio'}
               accessibilityLabel={option.label}
               accessibilityHint={option.description}
-              accessibilityState={{ checked }}
-              style={({ pressed }) => [styles.row, checked && styles.rowChecked, pressed && styles.pressed]}
+              accessibilityState={{ checked, disabled: option.disabled === true }}
+              style={({ pressed }) => [
+                styles.row,
+                checked && styles.rowChecked,
+                option.disabled === true && styles.rowDisabled,
+                pressed && styles.pressed,
+              ]}
             >
               <View style={[multiple ? styles.box : styles.circle, checked && styles.markChecked]}>
                 {checked ? (
@@ -109,6 +117,10 @@ const styles = StyleSheet.create({
   rowChecked: {
     borderColor: colors.primary,
     backgroundColor: colors.accent,
+  },
+  rowDisabled: {
+    borderStyle: 'dashed',
+    backgroundColor: colors.background,
   },
   pressed: {
     opacity: 0.75,

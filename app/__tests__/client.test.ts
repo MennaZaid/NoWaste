@@ -4,6 +4,8 @@ import {
   decideApplication,
   getMe,
   getMyListings,
+  getNearbyOffers,
+  getOffer,
   downloadListingPhoto,
   listApplications,
   login,
@@ -169,5 +171,57 @@ describe('FR-LST-06 my listings and the listing photo', () => {
     mockDownload.mockRejectedValueOnce(new Error('HTTP 401'));
 
     expect(await downloadListingPhoto('vendor-token', 'l1')).toBeNull();
+  });
+});
+
+describe('FR-RES-01 consumer offers (D-65)', () => {
+  test('FR-RES-01 getNearbyOffers sends the location and distance and reads the radius and offers', async () => {
+    answer(200, {
+      radius: { km: 12, defaultKm: 10, minKm: 1, maxKm: 50, stepKm: 1 },
+      offers: [{ id: 'o1' }],
+    });
+
+    const result = await getNearbyOffers('consumer-token', {
+      latitude: 30.5,
+      longitude: 31.25,
+      radiusKm: 12,
+    });
+
+    expect(result).toEqual({
+      kind: 'ok',
+      radius: { km: 12, defaultKm: 10, minKm: 1, maxKm: 50, stepKm: 1 },
+      offers: [{ id: 'o1' }],
+    });
+    expect(sent().url).toBe('http://api.test/listings/nearby?latitude=30.5&longitude=31.25&radiusKm=12');
+    expect(sent().headers.get('Authorization')).toBe('Bearer consumer-token');
+  });
+
+  test('FR-RES-01 without a distance, none is sent so the server uses its default', async () => {
+    answer(200, { radius: { km: 10, defaultKm: 10, minKm: 1, maxKm: 50, stepKm: 1 }, offers: [] });
+
+    await getNearbyOffers('consumer-token', { latitude: 30, longitude: 31 });
+
+    expect(sent().url).toBe('http://api.test/listings/nearby?latitude=30&longitude=31');
+  });
+
+  test('FR-RES-01 getOffer reads the offer, or notFound for 404', async () => {
+    answer(200, { id: 'o1' });
+    answer(404, { error: 'not_found' });
+
+    expect(await getOffer('consumer-token', 'o1')).toEqual({ kind: 'ok', offer: { id: 'o1' } });
+    expect(sent().url).toBe('http://api.test/listings/nearby/o1');
+    expect(await getOffer('consumer-token', 'gone')).toEqual({ kind: 'notFound' });
+  });
+
+  test('FR-RES-01 the photo of an offer is downloaded from GET /listings/nearby/:id/photo', async () => {
+    mockDownload.mockReset();
+    mockDownload.mockResolvedValueOnce({ uri: 'file:///cache/offer-photo-o1.jpg' });
+
+    expect(await downloadListingPhoto('consumer-token', 'o1', 'offer')).toBe(
+      'file:///cache/offer-photo-o1.jpg',
+    );
+    const [url, destination] = mockDownload.mock.calls[0] as [string, { parts: unknown[] }];
+    expect(url).toBe('http://api.test/listings/nearby/o1/photo');
+    expect(destination.parts).toEqual(['cache-dir', 'offer-photo-o1.jpg']);
   });
 });

@@ -71,7 +71,12 @@ export type ProfileField =
   | 'acceptedFoodTypes'
   | 'otherPartnerType'
   | 'otherFoodType'
-  | 'description';
+  | 'description'
+  | 'opensAt'
+  | 'closesAt'
+  | 'branches'
+  // D-64: a field of an extra branch, for example "branches.0.address".
+  | `branches.${number}.${BranchField}`;
 export type SignUpField = RegistrationField | ProfileField;
 
 export interface SignUpInput extends RegistrationInput {
@@ -90,7 +95,28 @@ export interface VendorProfile {
   contact: string;
   /** Optional; validateSignUp returns null when it is missing or blank. */
   description?: string | null;
+  /** D-62: opening hours ("HH:MM", Egypt time), required; a closing time before the opening time is after midnight. */
+  opensAt: string;
+  closesAt: string;
+  /** D-64: more branches besides the main shop (which becomes the first branch); optional when sending. */
+  branches?: Branch[];
 }
+
+/** D-64: a shop branch with its own map pin and opening hours. D-69: it carries the store name, so none is sent. */
+export interface Branch {
+  address: string;
+  latitude: number;
+  longitude: number;
+  opensAt: string;
+  closesAt: string;
+}
+
+export type BranchField = 'address' | 'latitude' | 'longitude' | 'opensAt' | 'closesAt';
+
+/** D-64: checks one branch. */
+export declare function validateBranch(
+  input: unknown,
+): { ok: true; value: Branch } | { ok: false; fields: BranchField[] };
 
 export interface PartnerProfile {
   organisationName: string;
@@ -122,6 +148,20 @@ export type SignUpValidation = { ok: true; value: ValidSignUp } | { ok: false; f
 
 export declare function validateSignUp(input: SignUpInput): SignUpValidation;
 
+/** D-62: a time of day "H:MM" or "HH:MM" (Arabic-Indic digits allowed), returned as "HH:MM", or null. */
+export declare function parseClockTime(value: unknown): string | null;
+
+export interface OpeningHours {
+  opensAt: string;
+  closesAt: string;
+}
+
+/** D-62: required shop opening hours. A closing time before the opening time is after midnight. */
+export declare function validateOpeningHours(input: {
+  opensAt?: unknown;
+  closesAt?: unknown;
+}): { ok: true; value: OpeningHours } | { ok: false; fields: ('opensAt' | 'closesAt')[] };
+
 /** FR-ACC-04: an email address or an Egyptian mobile number (returned in +20 form), or null. */
 export declare function parseLoginIdentifier(value: unknown): { email: string } | { phone: string } | null;
 
@@ -134,70 +174,77 @@ export type ListingFoodCategory = FoodCategory | Unknown;
 export declare const STORAGE_CONDITIONS: readonly StorageCondition[];
 export declare const LISTING_FOOD_CATEGORIES: readonly ListingFoodCategory[];
 
+/** D-63: the fields of a full listing. */
 export type ListingField =
   | 'photoKey'
-  | 'foodType'
+  | 'name'
+  | 'description'
+  | 'language'
   | 'foodCategory'
-  | 'descriptionAr'
-  | 'descriptionEn'
+  | 'storage'
   | 'bagsTotal'
   | 'originalValue'
   | 'price'
   | 'pickupStart'
   | 'pickupEnd'
-  | 'prepTime'
-  | 'storage'
-  | 'expiryAt'
-  | 'location';
+  | 'branchId';
 
 export interface ListingInput {
   photoKey?: unknown;
-  foodType?: unknown;
+  name?: unknown;
+  description?: unknown;
+  language?: unknown;
   foodCategory?: unknown;
-  descriptionAr?: unknown;
-  descriptionEn?: unknown;
+  storage?: unknown;
   bagsTotal?: unknown;
   originalValue?: unknown;
   price?: unknown;
   pickupStart?: unknown;
+  /** D-69: optional; the vendor's end time, no later than the worked-out limit. */
   pickupEnd?: unknown;
-  prepTime?: unknown;
-  storage?: unknown;
-  expiryAt?: unknown;
-  location?: unknown;
+  branchId?: unknown;
 }
 
 export interface ValidListing {
   photoKey: string;
-  foodType: string;
+  /** Written in `language` and shown as written (D-63, D-66). */
+  name: string;
+  description: string;
+  language: Language;
   foodCategory: ListingFoodCategory;
-  descriptionAr: string;
-  descriptionEn: string;
+  storage: StorageCondition;
   bagsTotal: number;
   originalValue: number;
   price: number;
   pickupStart: string;
-  pickupEnd: string;
-  /** null = Unknown. */
-  prepTime: string | null;
-  storage: StorageCondition;
-  /** null = Unknown. */
-  expiryAt: string | null;
-  /** null = the shop pin. */
-  location: { latitude: number; longitude: number } | null;
+  /** D-69: the vendor's end time, or null to use the worked-out limit. */
+  pickupEnd: string | null;
+  branchId: string;
 }
 
 export type ListingValidation =
-  | { ok: true; value: ValidListing }
-  | { ok: false; error: 'E-LST-04'; fields: ListingField[] }
-  | { ok: false; error: 'E-LST-03'; field: 'pickupEnd' };
+  { ok: true; value: ValidListing } | { ok: false; error: 'E-LST-04'; fields: ListingField[] };
 
 export declare function validateListing(input: ListingInput): ListingValidation;
 
-export type QuickPostField = 'photoKey' | 'bagsTotal' | 'price' | 'pickupEnd';
+export type QuickPostField =
+  | 'photoKey'
+  | 'name'
+  | 'description'
+  | 'language'
+  | 'foodCategory'
+  | 'bagsTotal'
+  | 'price'
+  | 'pickupStart'
+  | 'pickupEnd';
 
 export interface ValidQuickPost {
   photoKey: string;
+  name: string;
+  description: string;
+  language: Language;
+  /** D-68: optional in the input; 'unknown' when not given. */
+  foodCategory: ListingFoodCategory;
   bagsTotal: number;
   price: number;
   pickupStart: string;
@@ -205,6 +252,17 @@ export interface ValidQuickPost {
 }
 
 export declare function validateQuickPost(
-  input: { photoKey?: unknown; bagsTotal?: unknown; price?: unknown; pickupEnd?: unknown },
+  input: {
+    photoKey?: unknown;
+    name?: unknown;
+    description?: unknown;
+    language?: unknown;
+    foodCategory?: unknown;
+    bagsTotal?: unknown;
+    price?: unknown;
+    /** D-75: optional; when the pickup starts. Without it, or when already passed, it is `now`. */
+    pickupStart?: unknown;
+    pickupEnd?: unknown;
+  },
   now: Date,
 ): { ok: true; value: ValidQuickPost } | { ok: false; error: 'E-LST-04'; fields: QuickPostField[] };

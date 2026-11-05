@@ -69,6 +69,8 @@ function Navigator() {
           <Stack.Screen name="listings/quick" options={{ title: t('quickPost.title') }} />
           <Stack.Screen name="listings/[id]" options={{ title: t('listing.detailsTitle') }} />
           <Stack.Screen name="listings/index" options={{ title: t('myListings.title') }} />
+          <Stack.Screen name="vendor/hours" options={{ title: t('openingHours.title') }} />
+          <Stack.Screen name="offers/[id]" options={{ title: t('offers.detailsTitle') }} />
         </Stack>
         <StatusBar style="dark" />
       </View>

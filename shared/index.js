@@ -157,13 +157,51 @@ function isValidOptionalText(value, max) {
   return isBlank(value) || isFilledText(value, max);
 }
 
-/** FR-ACC-02 and D-26: shop name, vendor type, location, contact phone and an optional description. */
+/** D-62: a time of day "H:MM" or "HH:MM" (Arabic-Indic digits allowed), returned as "HH:MM", or null. */
+function parseClockTime(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(toLatinDigits(value.trim()));
+  if (match === null) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return `${String(hours).padStart(2, '0')}:${match[2]}`;
+}
+
+/**
+ * D-62: shop opening hours, the same every day, required for every vendor (2026-11-03). Both must be valid times and
+ * differ; a closing time earlier than the opening time means after midnight. Returns the invalid fields.
+ */
+function validateOpeningHours(input) {
+  const source = asObject(input);
+  const opensAt = parseClockTime(source.opensAt);
+  const closesAt = parseClockTime(source.closesAt);
+  const fields = [];
+  if (opensAt === null) fields.push('opensAt');
+  if (closesAt === null || (opensAt !== null && closesAt === opensAt)) fields.push('closesAt');
+  return fields.length > 0 ? { ok: false, fields } : { ok: true, value: { opensAt, closesAt } };
+}
+
+/** FR-ACC-02 and D-26: shop name, vendor type, location, contact phone, an optional description and hours (D-62). */
+// The opening hours are required (D-62, 2026-11-03).
 function checkVendorProfile(profile, fields) {
   if (!isFilledText(profile.shopName, TEXT_LIMITS.name)) fields.push('shopName');
   if (!VENDOR_TYPES.includes(profile.vendorType)) fields.push('vendorType');
   checkLocation(profile, fields);
   if (normalizeEgyptianPhone(profile.contact) === null) fields.push('contact');
   if (!isValidOptionalText(profile.description, TEXT_LIMITS.description)) fields.push('description');
+  const hours = validateOpeningHours(profile);
+  if (!hours.ok) fields.push(...hours.fields);
+  // D-64: more branches besides the main shop (optional).
+  const branches = profile.branches === undefined ? [] : profile.branches;
+  if (!Array.isArray(branches)) {
+    fields.push('branches');
+  } else {
+    branches.forEach((branch, index) => {
+      const check = validateBranch(branch);
+      if (!check.ok) fields.push(...check.fields.map((field) => `branches.${index}.${field}`));
+    });
+  }
 }
 
 /**
@@ -220,6 +258,11 @@ function validateSignUp(input) {
       longitude: p.longitude,
       contact: normalizeEgyptianPhone(p.contact),
       description: isBlank(p.description) ? null : p.description.trim(),
+      // D-62: opening hours ("HH:MM").
+      opensAt: validateOpeningHours(p).value.opensAt,
+      closesAt: validateOpeningHours(p).value.closesAt,
+      // D-64: the extra branches; the main shop itself becomes the first branch on the server.
+      branches: (p.branches ?? []).map((branch) => validateBranch(branch).value),
     };
   } else if (PARTNER_ROLES.includes(role)) {
     const p = input.partnerProfile;
@@ -265,89 +308,123 @@ function isPositiveAmount(value) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
-/** An optional pickup location {latitude, longitude}; missing means the shop pin. */
-function readLocation(value) {
-  if (value === undefined || value === null) return { ok: true, value: null };
-  const { latitude, longitude } = asObject(value);
-  return isNumberBetween(latitude, -90, 90) && isNumberBetween(longitude, -180, 180)
-    ? { ok: true, value: { latitude, longitude } }
-    : { ok: false };
+/** A UUID such as a branch id. */
+function isUuid(value) {
+  return (
+    typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+/** D-63: the listing text is written once, in Arabic or English; the server translates it into the other language. */
+function checkListingText(input, fields) {
+  if (!isFilledText(input.name, TEXT_LIMITS.name)) fields.push('name');
+  if (!isFilledText(input.description, TEXT_LIMITS.description)) fields.push('description');
+  if (!LANGUAGES.includes(input.language)) fields.push('language');
 }
 
 /**
- * Checks a full listing (FR-LST-01, FR-LST-04). Returns every invalid field as E-LST-04; when the fields are valid
- * but the pickup window ends after the expiry, returns E-LST-03 for pickupEnd (NFR-05c: ending exactly at the
- * expiry is allowed). A price of 0 is refused for now (open question 24).
+ * Checks a full listing (FR-LST-01, FR-LST-04 as changed by D-63): photo, name and description in one language,
+ * food category, storage, number of bags, original and discounted price, pickup start and the branch. The pick-by
+ * time is not sent: the server works it out from the rules and the branch's closing time (D-64). A price of 0 is
+ * refused for now (open question 24); the discounted price may not be higher than the original value (E-LST-04).
  */
 function validateListing(input) {
   const fields = [];
   if (!isFilledText(input.photoKey, 200)) fields.push('photoKey');
-  if (!isFilledText(input.foodType, TEXT_LIMITS.name)) fields.push('foodType');
+  checkListingText(input, fields);
   if (!LISTING_FOOD_CATEGORIES.includes(input.foodCategory)) fields.push('foodCategory');
-  if (!isFilledText(input.descriptionAr, TEXT_LIMITS.description)) fields.push('descriptionAr');
-  if (!isFilledText(input.descriptionEn, TEXT_LIMITS.description)) fields.push('descriptionEn');
+  if (!STORAGE_CONDITIONS.includes(input.storage)) fields.push('storage');
   if (!isWholeNumberFrom(input.bagsTotal, 1)) fields.push('bagsTotal');
   const originalOk = isPositiveAmount(input.originalValue);
   if (!originalOk) fields.push('originalValue');
-  // E-LST-04: the discounted price may not be higher than the original value.
   if (!isPositiveAmount(input.price) || (originalOk && input.price > input.originalValue))
     fields.push('price');
   const start = parseTime(input.pickupStart);
   if (start === null) fields.push('pickupStart');
-  const end = parseTime(input.pickupEnd);
-  if (end === null || (start !== null && end <= start)) fields.push('pickupEnd');
-  const prep = parseTime(input.prepTime);
-  if (input.prepTime !== UNKNOWN && prep === null) fields.push('prepTime');
-  if (!STORAGE_CONDITIONS.includes(input.storage)) fields.push('storage');
-  const expiry = parseTime(input.expiryAt);
-  if (input.expiryAt !== UNKNOWN && expiry === null) fields.push('expiryAt');
-  const location = readLocation(input.location);
-  if (!location.ok) fields.push('location');
+  // D-69: optional; when given it must be after the start (the server also keeps it within the worked-out limit).
+  const end = input.pickupEnd === undefined ? null : parseTime(input.pickupEnd);
+  if (input.pickupEnd !== undefined && (end === null || (start !== null && end <= start))) {
+    fields.push('pickupEnd');
+  }
+  if (!isUuid(input.branchId)) fields.push('branchId');
 
   if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
-  if (expiry !== null && end > expiry) return { ok: false, error: 'E-LST-03', field: 'pickupEnd' };
-
   return {
     ok: true,
     value: {
       photoKey: input.photoKey.trim(),
-      foodType: input.foodType.trim(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      language: input.language,
       foodCategory: input.foodCategory,
-      descriptionAr: input.descriptionAr.trim(),
-      descriptionEn: input.descriptionEn.trim(),
+      storage: input.storage,
       bagsTotal: input.bagsTotal,
       originalValue: input.originalValue,
       price: input.price,
       pickupStart: new Date(start).toISOString(),
-      pickupEnd: new Date(end).toISOString(),
-      prepTime: prep === null ? null : new Date(prep).toISOString(),
-      storage: input.storage,
-      expiryAt: expiry === null ? null : new Date(expiry).toISOString(),
-      location: location.value,
+      pickupEnd: end === null ? null : new Date(end).toISOString(),
+      branchId: input.branchId,
     },
   };
 }
 
 /**
- * Checks a Quick Post (FR-LST-02): only a photo, the number of bags, the price and the pickup end time. The pickup
- * starts at the time of posting (`now`, decision D-43), so the end must be after it.
+ * Checks a Quick Post (FR-LST-02, with name and description since D-63): photo, name and description in one
+ * language, the number of bags, the price and the pickup end time. D-75: the pickup start is optional; without it the
+ * pickup starts at the time of posting (`now`, decision D-43), and a start already passed is taken as now. The end
+ * must be after the start. The server also checks the opening hours and the 6-hour limit.
  */
 function validateQuickPost(input, now) {
   const fields = [];
   if (!isFilledText(input.photoKey, 200)) fields.push('photoKey');
+  checkListingText(input, fields);
+  // D-68: optional; Unknown when not given. It lets charities and composting partners that accept the food match.
+  const foodCategory = input.foodCategory === undefined ? 'unknown' : input.foodCategory;
+  if (!LISTING_FOOD_CATEGORIES.includes(foodCategory)) fields.push('foodCategory');
   if (!isWholeNumberFrom(input.bagsTotal, 1)) fields.push('bagsTotal');
   if (!isPositiveAmount(input.price)) fields.push('price');
+  const chosenStart = input.pickupStart === undefined ? now.getTime() : parseTime(input.pickupStart);
+  if (chosenStart === null) fields.push('pickupStart');
+  const start = Math.max(chosenStart ?? now.getTime(), now.getTime());
   const end = parseTime(input.pickupEnd);
-  if (end === null || end <= now.getTime()) fields.push('pickupEnd');
+  if (end === null || end <= start) fields.push('pickupEnd');
   if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
   return {
     ok: true,
     value: {
       photoKey: input.photoKey.trim(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      language: input.language,
+      foodCategory,
       bagsTotal: input.bagsTotal,
       price: input.price,
-      pickupStart: now.toISOString(),
+      pickupStart: new Date(start).toISOString(),
       pickupEnd: new Date(end).toISOString(),
+    },
+  };
+}
+
+/**
+ * D-64: one shop branch: a name, a written address, a map pin and its own opening hours (D-62 rules). Returns the
+ * invalid fields (name, address, latitude, longitude, opensAt, closesAt).
+ */
+function validateBranch(input) {
+  const branch = asObject(input);
+  const fields = [];
+  // D-69: a branch has no name of its own; it carries the store name (set by the server).
+  checkLocation(branch, fields);
+  const hours = validateOpeningHours(branch);
+  if (!hours.ok) fields.push(...hours.fields);
+  if (fields.length > 0) return { ok: false, fields };
+  return {
+    ok: true,
+    value: {
+      address: branch.address.trim(),
+      latitude: branch.latitude,
+      longitude: branch.longitude,
+      opensAt: hours.value.opensAt,
+      closesAt: hours.value.closesAt,
     },
   };
 }
@@ -370,10 +447,13 @@ module.exports = {
   normalizeEgyptianPhone,
   validateRegistration,
   validateSignUp,
+  parseClockTime,
+  validateOpeningHours,
   PHOTO_MAX_BYTES,
   UNKNOWN,
   STORAGE_CONDITIONS,
   LISTING_FOOD_CATEGORIES,
   validateListing,
   validateQuickPost,
+  validateBranch,
 };

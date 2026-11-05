@@ -288,12 +288,29 @@ export async function decideApplication(
 // ---------------------------------------------------------------------------------------------------------------
 // Listings (US-10, US-11, US-13). Only Approved vendors may create or publish; others get 403 E-LST-06.
 
+/** D-64: a place where the vendor's food is picked up. The shop given at sign-up is the first branch. */
+export interface Branch {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  /** "HH:MM" (Egypt time), or null for a branch registered before opening hours were required (D-62). */
+  opensAt: string | null;
+  closesAt: string | null;
+}
+
 export interface Shop {
   shopName: string;
   vendorType: 'formal' | 'informal';
   address: string;
   latitude: number;
   longitude: number;
+  /** D-62: opening hours "HH:MM" (Egypt time), or null when the vendor gave none. */
+  opensAt: string | null;
+  closesAt: string | null;
+  /** D-64: the vendor's branches, the shop itself first. */
+  branches: Branch[];
 }
 
 /** GET /vendors/me: the shop pin (start of the pickup location) and the vendor type (Quick Post). */
@@ -308,26 +325,61 @@ export async function getShop(token: string): Promise<Protected<{ kind: 'ok'; sh
 export interface Listing {
   id: string;
   status: 'Draft' | 'Active' | 'Fully reserved' | 'Closed' | 'Cancelled';
-  listingType: string | null;
+  /** Set from the chosen destination (FR-RTE-06); null until then. */
+  listingType: 'Discounted Surplus Bag' | 'Donation' | 'Compost offer' | null;
   isQuickPost: boolean;
   foodType: string | null;
   foodCategory: ListingFoodCategory;
   photoKey: string;
+  /** D-63: the name and description per language; null when not translated (yet). */
+  nameAr: string | null;
+  nameEn: string | null;
   descriptionAr: string | null;
   descriptionEn: string | null;
+  /** The language the vendor wrote in; null for listings made before D-63. */
+  sourceLanguage: Language | null;
+  /** D-64: where the food is picked up. */
+  branchId: string | null;
   bagsTotal: number;
   bagsAvailable: number;
   originalValue: number | null;
   price: number;
   pickupStart: string;
+  /** The pick-by time (D-64). */
   pickupEnd: string;
-  /** An ISO time, "unknown", or null when not asked (Quick Post). */
-  prepTime: string | null;
   storage: StorageCondition | null;
-  expiryAt: string | null;
-  perishabilityCategory: string | null;
+  perishabilityCategory: PerishabilityCategory | null;
+  /** How soon to collect (FR-RTE-04); null until the category is confirmed. */
+  urgency: Urgency | null;
+  unfitForPeople: boolean;
   latitude: number;
   longitude: number;
+}
+
+/** US-18: most urgent first. */
+export type PerishabilityCategory = 'Highly perishable' | 'Short-life' | 'Long-life';
+
+/** D-61: how soon to collect, as a time: the pickup end, which is never later than the food limit. */
+export interface Urgency {
+  collectBy: string;
+}
+
+/** US-19 destinations, in the SRS order: consumers, charity, composting, landfill last. */
+export type Destination = 'consumers' | 'charity' | 'composting' | 'landfill';
+
+export interface DestinationOption {
+  destination: Destination;
+  partners: number | null;
+  nearestPartnerMeters: number | null;
+  /** Landfill is shown but cannot be chosen yet (US-25). */
+  available: boolean;
+}
+
+export interface Destinations {
+  options: DestinationOption[];
+  /** null when the recommendation failed (E-RTE-02). */
+  recommended: Destination | null;
+  timeLeftMinutes: number;
 }
 
 /** E-LST-06 = the vendor is not Approved. */
@@ -366,35 +418,46 @@ export async function uploadListingPhoto(
     : { kind: 'failed' };
 }
 
+/** D-63, D-64: the name and description in one language; the pick-by time is worked out by the server. */
 export type ListingRequest = {
   photoKey: string;
-  foodType: string;
-  foodCategory: ListingFoodCategory;
-  descriptionAr: string;
-  descriptionEn: string;
+  name: string;
+  description: string;
+  language: Language;
+  foodCategory: ListingFoodCategory | undefined;
+  storage: StorageCondition | undefined;
   bagsTotal: number | undefined;
   originalValue: number | undefined;
   price: number | undefined;
   pickupStart: string | undefined;
+  /** D-69: the vendor's end time, or undefined to use the worked-out limit. */
   pickupEnd: string | undefined;
-  prepTime: string | undefined;
-  storage: StorageCondition | undefined;
-  expiryAt: string | undefined;
-  location: { latitude: number; longitude: number } | undefined;
+  branchId: string | undefined;
 };
 
 export type QuickPostRequest = {
   photoKey: string;
+  name: string;
+  description: string;
+  language: Language;
+  /** D-68: optional; Unknown when the vendor does not say. */
+  foodCategory: ListingFoodCategory;
   bagsTotal: number | undefined;
   price: number | undefined;
+  /** D-75: optional; undefined = the pickup starts when it is posted. */
+  pickupStart: string | undefined;
   pickupEnd: string | undefined;
 };
 
 export type SaveListingResult = ListingAnswer<
   | { kind: 'ok'; listing: Listing }
-  | { kind: 'invalid'; fields: string[] } // E-LST-04
-  | { kind: 'afterExpiry' } // E-LST-03
+  // E-LST-04; with the opening hours when the pickup is outside them (D-62).
+  | { kind: 'invalid'; fields: string[]; hours?: { opensAt: string; closesAt: string } }
+  // E-LST-03; with the latest allowed end when the pickup goes past the food limit (D-61).
+  | { kind: 'afterExpiry'; latestPickupEnd?: string }
   | { kind: 'formalVendor' } // Quick Post is for informal vendors only
+  | { kind: 'informalVendor' } // D-64: full listings are for formal vendors only
+  | { kind: 'hoursRequired' } // D-62: the shop's opening hours must be set first
 >;
 
 async function saveListing(path: string, body: object, token: string): Promise<SaveListingResult> {
@@ -404,10 +467,20 @@ async function saveListing(path: string, body: object, token: string): Promise<S
   if (notApproved(result)) return { kind: 'notApproved' };
   if (result.status === 201 && data !== null) return { kind: 'ok', listing: data as unknown as Listing };
   if (result.status === 400 && data?.error === 'E-LST-04' && Array.isArray(data.fields)) {
-    return { kind: 'invalid', fields: data.fields as string[] };
+    const hours =
+      typeof data.opensAt === 'string' && typeof data.closesAt === 'string'
+        ? { hours: { opensAt: data.opensAt, closesAt: data.closesAt } }
+        : {};
+    return { kind: 'invalid', fields: data.fields as string[], ...hours };
   }
-  if (result.status === 400 && data?.error === 'E-LST-03') return { kind: 'afterExpiry' };
+  if (result.status === 400 && data?.error === 'E-LST-03') {
+    return typeof data.latestPickupEnd === 'string'
+      ? { kind: 'afterExpiry', latestPickupEnd: data.latestPickupEnd }
+      : { kind: 'afterExpiry' };
+  }
   if (result.status === 403 && data?.error === 'quick_post_informal_only') return { kind: 'formalVendor' };
+  if (result.status === 403 && data?.error === 'full_listing_formal_only') return { kind: 'informalVendor' };
+  if (result.status === 409 && data?.error === 'opening_hours_required') return { kind: 'hoursRequired' };
   return { kind: 'unexpected' };
 }
 
@@ -421,6 +494,108 @@ export function createQuickPost(token: string, body: QuickPostRequest): Promise<
   return saveListing('/listings/quick', body, token);
 }
 
+export interface PickByPreview {
+  pickupEnd: string;
+  closesAt: string;
+  /** True when the rules would give a later time and the branch's closing time was used instead. */
+  cappedAtClosing: boolean;
+  /** D-74: the estimated category, shown to the vendor as the reason for the window. */
+  category: PerishabilityCategory;
+}
+
+/**
+ * POST /listings/pick-by (D-64): the pick-by time the server will save for this food, start and branch. A start when
+ * the branch is closed gives "invalid" with the hours.
+ */
+export async function previewPickBy(
+  token: string,
+  body: {
+    foodCategory: ListingFoodCategory;
+    storage: StorageCondition;
+    pickupStart: string;
+    branchId: string;
+  },
+): Promise<
+  ListingAnswer<
+    | { kind: 'ok'; preview: PickByPreview }
+    | { kind: 'invalid'; fields: string[]; hours?: { opensAt: string; closesAt: string } }
+    | { kind: 'hoursRequired' }
+  >
+> {
+  const result = await protectedCall(
+    '/listings/pick-by',
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  if (result.status === 200 && data !== null && typeof data.pickupEnd === 'string') {
+    return { kind: 'ok', preview: data as unknown as PickByPreview };
+  }
+  if (result.status === 400 && data?.error === 'E-LST-04' && Array.isArray(data.fields)) {
+    const hours =
+      typeof data.opensAt === 'string' && typeof data.closesAt === 'string'
+        ? { hours: { opensAt: data.opensAt, closesAt: data.closesAt } }
+        : {};
+    return { kind: 'invalid', fields: data.fields as string[], ...hours };
+  }
+  if (result.status === 409 && data?.error === 'opening_hours_required') return { kind: 'hoursRequired' };
+  return { kind: 'unexpected' };
+}
+
+/** D-69: a branch carries the store name, so none is sent. */
+export type NewBranchRequest = {
+  address: string;
+  latitude: number | undefined;
+  longitude: number | undefined;
+  opensAt: string;
+  closesAt: string;
+};
+
+/** POST /vendors/me/branches (D-64): adds a branch with its own pin and opening hours. */
+export async function addBranch(
+  token: string,
+  branch: NewBranchRequest,
+): Promise<Protected<{ kind: 'ok'; branch: Branch } | { kind: 'invalid'; fields: string[] }>> {
+  const result = await protectedCall(
+    '/vendors/me/branches',
+    { method: 'POST', body: JSON.stringify(branch) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (result.status === 400 && data?.error === 'E-ACC-02' && Array.isArray(data.fields)) {
+    return { kind: 'invalid', fields: data.fields as string[] };
+  }
+  return result.status === 201 && data !== null
+    ? { kind: 'ok', branch: data as unknown as Branch }
+    : { kind: 'unexpected' };
+}
+
+/** PATCH /vendors/me/branches/:id {opensAt, closesAt} (D-64): one branch's opening hours. */
+export async function updateBranchHours(
+  token: string,
+  id: string,
+  hours: { opensAt: string; closesAt: string },
+): Promise<
+  Protected<{ kind: 'ok'; branch: Branch } | { kind: 'invalid'; fields: ('opensAt' | 'closesAt')[] }>
+> {
+  const result = await protectedCall(
+    `/vendors/me/branches/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(hours) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (result.status === 400 && data?.error === 'E-ACC-02' && Array.isArray(data.fields)) {
+    return { kind: 'invalid', fields: data.fields as ('opensAt' | 'closesAt')[] };
+  }
+  return result.status === 200 && data !== null
+    ? { kind: 'ok', branch: data as unknown as Branch }
+    : { kind: 'unexpected' };
+}
+
 /** GET /listings/:id: the vendor's own listing. */
 export async function getListing(
   token: string,
@@ -431,6 +606,22 @@ export async function getListing(
   if (result.status === 404) return { kind: 'notFound' };
   return result.status === 200 && result.data !== null
     ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
+}
+
+/** PATCH /vendors/me {opensAt, closesAt} (D-62): saves the opening hours; both empty removes them. */
+export async function updateOpeningHours(
+  token: string,
+  hours: { opensAt: string; closesAt: string },
+): Promise<Protected<{ kind: 'ok'; shop: Shop } | { kind: 'invalid'; fields: ('opensAt' | 'closesAt')[] }>> {
+  const result = await protectedCall('/vendors/me', { method: 'PATCH', body: JSON.stringify(hours) }, token);
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (result.status === 400 && data?.error === 'E-ACC-02' && Array.isArray(data.fields)) {
+    return { kind: 'invalid', fields: data.fields as ('opensAt' | 'closesAt')[] };
+  }
+  return result.status === 200 && data !== null
+    ? { kind: 'ok', shop: data as unknown as Shop }
     : { kind: 'unexpected' };
 }
 
@@ -448,11 +639,18 @@ export async function getMyListings(token: string): Promise<Protected<{ kind: 'o
  * The photo needs the login token, and the phone's Image component drops request headers on Android (D-51), so the
  * file is downloaded here with the token and the screen shows the local copy.
  */
-export async function downloadListingPhoto(token: string, id: string): Promise<string | null> {
+export async function downloadListingPhoto(
+  token: string,
+  id: string,
+  source: 'vendor' | 'offer' = 'vendor',
+): Promise<string | null> {
+  // D-65: a consumer reads the photo of an offer through /listings/nearby/:id/photo.
+  const path =
+    source === 'offer' ? `/listings/nearby/${encodeURIComponent(id)}` : `/listings/${encodeURIComponent(id)}`;
   try {
     const file = await File.downloadFileAsync(
-      `${getApiBaseUrl()}/listings/${encodeURIComponent(id)}/photo`,
-      new File(Paths.cache, `listing-photo-${id}.jpg`),
+      `${getApiBaseUrl()}${path}/photo`,
+      new File(Paths.cache, `${source === 'offer' ? 'offer' : 'listing'}-photo-${id}.jpg`),
       { headers: { Authorization: `Bearer ${token}` }, idempotent: true },
     );
     return file.uri;
@@ -465,7 +663,7 @@ export async function downloadListingPhoto(token: string, id: string): Promise<s
 export async function publishListing(
   token: string,
   id: string,
-): Promise<ListingAnswer<{ kind: 'ok'; listing: Listing } | { kind: 'notDraft' }>> {
+): Promise<ListingAnswer<{ kind: 'ok'; listing: Listing } | { kind: 'notDraft' } | { kind: 'notReady' }>> {
   const result = await protectedCall(
     `/listings/${encodeURIComponent(id)}/publish`,
     { method: 'POST' },
@@ -473,8 +671,161 @@ export async function publishListing(
   );
   if (result.kind !== 'response') return result;
   if (notApproved(result)) return { kind: 'notApproved' };
+  // US-18, US-19: the category must be confirmed and a destination chosen first.
+  if (result.status === 409 && result.data?.error === 'not_ready_to_publish') return { kind: 'notReady' };
   if (result.status === 409) return { kind: 'notDraft' };
   return result.status === 200 && result.data !== null
     ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
+}
+
+const listingPath = (id: string, rest: string) => `/listings/${encodeURIComponent(id)}${rest}`;
+
+/** D-70: the BR-01 hours behind the perishability categories. */
+export interface CategoryHours {
+  highlyPerishableMaxHours: number;
+  shortLifeMaxHours: number;
+}
+
+/** GET /perishability/categories (D-70). */
+export async function getCategoryHours(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; hours: CategoryHours }>> {
+  const result = await protectedCall('/perishability/categories', {}, token);
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  return result.status === 200 &&
+    typeof data?.highlyPerishableMaxHours === 'number' &&
+    typeof data.shortLifeMaxHours === 'number'
+    ? { kind: 'ok', hours: data as unknown as CategoryHours }
+    : { kind: 'unexpected' };
+}
+
+/** GET /listings/:id/destinations (US-19, FR-RTE-05, E-RTE-02). */
+export async function getDestinations(
+  token: string,
+  id: string,
+): Promise<ListingAnswer<{ kind: 'ok'; destinations: Destinations }>> {
+  const result = await protectedCall(listingPath(id, '/destinations'), {}, token);
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  return result.status === 200 && result.data !== null && Array.isArray(result.data.options)
+    ? { kind: 'ok', destinations: result.data as unknown as Destinations }
+    : { kind: 'unexpected' };
+}
+
+/** POST /listings/:id/destination {destination} (US-19, FR-RTE-06). */
+export async function chooseDestination(
+  token: string,
+  id: string,
+  destination: Destination,
+): Promise<
+  ListingAnswer<{ kind: 'ok'; listing: Listing } | { kind: 'notEligible' } | { kind: 'pickupEnded' }>
+> {
+  const result = await protectedCall(
+    listingPath(id, '/destination'),
+    { method: 'POST', body: JSON.stringify({ destination }) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  // D-68: a Quick Post whose pickup has ended can no longer change its destination.
+  if (result.status === 409 && result.data?.error === 'pickup_ended') return { kind: 'pickupEnded' };
+  if (result.status === 409) return { kind: 'notEligible' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
+}
+
+/** POST /listings/:id/unfit {unfitForPeople} (US-19, FR-RTE-07). */
+export async function markUnfit(
+  token: string,
+  id: string,
+  unfitForPeople: boolean,
+): Promise<ListingAnswer<{ kind: 'ok'; listing: Listing }>> {
+  const result = await protectedCall(
+    listingPath(id, '/unfit'),
+    { method: 'POST', body: JSON.stringify({ unfitForPeople }) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', listing: result.data as unknown as Listing }
+    : { kind: 'unexpected' };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Consumer offers (US-26, FR-RES-01, FR-RTE-08, FR-RTE-09, decision D-65).
+
+/** Where an offer is picked up; offers with the same key are one pin on the map. */
+export interface OfferPlace {
+  key: string;
+  branchId: string | null;
+  shopName: string;
+  branchName: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface Offer {
+  id: string;
+  nameAr: string | null;
+  nameEn: string | null;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  sourceLanguage: Language | null;
+  foodType: string | null;
+  foodCategory: ListingFoodCategory;
+  isQuickPost: boolean;
+  bagsAvailable: number;
+  originalValue: number | null;
+  price: number;
+  pickupStart: string;
+  pickupEnd: string;
+  // D-73: customers are not shown the perishability category; the pickup window says when to come.
+  /** null on the product page (no consumer location sent). */
+  distanceMeters: number | null;
+  place: OfferPlace;
+}
+
+/** The distance used and the slider range, from the settings row FR-RES-01. */
+export interface SearchRadius {
+  km: number;
+  defaultKm: number;
+  minKm: number;
+  maxKm: number;
+  stepKm: number;
+}
+
+/** GET /listings/nearby: offers near a point, in the FR-RTE-08 / FR-RTE-09 order. Without radiusKm: the default. */
+export async function getNearbyOffers(
+  token: string,
+  query: { latitude: number; longitude: number; radiusKm?: number },
+): Promise<Protected<{ kind: 'ok'; radius: SearchRadius; offers: Offer[] }>> {
+  const params = new URLSearchParams({
+    latitude: String(query.latitude),
+    longitude: String(query.longitude),
+  });
+  if (query.radiusKm !== undefined) params.set('radiusKm', String(query.radiusKm));
+  const result = await protectedCall(`/listings/nearby?${params.toString()}`, {}, token);
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  return result.status === 200 && data !== null && Array.isArray(data.offers)
+    ? { kind: 'ok', radius: data.radius as SearchRadius, offers: data.offers as Offer[] }
+    : { kind: 'unexpected' };
+}
+
+/** GET /listings/nearby/:id: the product page; notFound when it is no longer offered. */
+export async function getOffer(
+  token: string,
+  id: string,
+): Promise<Protected<{ kind: 'ok'; offer: Offer } | { kind: 'notFound' }>> {
+  const result = await protectedCall(`/listings/nearby/${encodeURIComponent(id)}`, {}, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', offer: result.data as unknown as Offer }
     : { kind: 'unexpected' };
 }

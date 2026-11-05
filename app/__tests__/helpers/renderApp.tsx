@@ -12,6 +12,8 @@ import NewListingScreen from '../../app/listings/new';
 import QuickPostScreen from '../../app/listings/quick';
 import ListingScreen from '../../app/listings/[id]';
 import MyListingsScreen from '../../app/listings/index';
+import OpeningHoursScreen from '../../app/vendor/hours';
+import OfferScreen from '../../app/offers/[id]';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -28,6 +30,8 @@ export function renderApp(initialUrl = '/') {
       'listings/quick': QuickPostScreen,
       'listings/[id]': ListingScreen,
       'listings/index': MyListingsScreen,
+      'vendor/hours': OpeningHoursScreen,
+      'offers/[id]': OfferScreen,
     },
     { initialUrl },
   );

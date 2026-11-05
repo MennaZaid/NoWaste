@@ -19,7 +19,8 @@ const english = {
 
 const arabic = {
   title: 'يجب أن تحتوي كلمة المرور على:',
-  rules: ['8 أحرف على الأقل', 'حرف واحد على الأقل', 'رقم واحد على الأقل'],
+  // D-67: numbers in Arabic texts use Arabic digits.
+  rules: ['٨ أحرف على الأقل', 'حرف واحد على الأقل', 'رقم واحد على الأقل'],
 };
 
 beforeEach(async () => {
@@ -97,7 +98,7 @@ describe('NFR-06 password rule texts are complete in both languages', () => {
     await openRegister('ar');
     await fireEvent.changeText(screen.getByTestId('register-password'), 'abcd1234');
 
-    expect(screen.getByLabelText('8 أحرف على الأقل, متحقق')).toBeOnTheScreen();
+    expect(screen.getByLabelText('٨ أحرف على الأقل, متحقق')).toBeOnTheScreen();
     expect(screen.getByLabelText('حرف واحد على الأقل, متحقق')).toBeOnTheScreen();
     expect(screen.getByLabelText('رقم واحد على الأقل, متحقق')).toBeOnTheScreen();
   });

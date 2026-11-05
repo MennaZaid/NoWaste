@@ -3,6 +3,7 @@
 import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import type { Language } from '@nowaste/shared';
+import { localDigits } from './digits';
 import ar from './ar.json';
 import en from './en.json';
 
@@ -15,15 +16,27 @@ export const translations = { ar, en } as const;
 
 const i18n = createInstance();
 
-void i18n.use(initReactI18next).init({
-  resources: {
-    ar: { translation: ar },
-    en: { translation: en },
-  },
-  lng: DEFAULT_LANGUAGE,
-  fallbackLng: DEFAULT_LANGUAGE,
-  initAsync: false,
-  interpolation: { escapeValue: false },
-});
+// D-67: every Arabic text shows its numbers (prices, distances, counts, times) with Arabic-Indic digits.
+const arabicDigits = {
+  type: 'postProcessor' as const,
+  name: 'arabicDigits',
+  process: (value: string, _key: string | string[], _options: unknown, translator: { language?: string }) =>
+    translator.language === 'ar' ? localDigits(value, 'ar') : value,
+};
+
+void i18n
+  .use(initReactI18next)
+  .use(arabicDigits)
+  .init({
+    resources: {
+      ar: { translation: ar },
+      en: { translation: en },
+    },
+    lng: DEFAULT_LANGUAGE,
+    fallbackLng: DEFAULT_LANGUAGE,
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    postProcess: ['arabicDigits'],
+  });
 
 export default i18n;

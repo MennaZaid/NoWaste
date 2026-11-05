@@ -16,6 +16,12 @@ jest.mock('@/api/client', () => ({
   login: jest.fn(),
   logout: jest.fn().mockResolvedValue(undefined),
   getMe: jest.fn(),
+  // D-65: the consumer home loads the offers near the consumer.
+  getNearbyOffers: jest.fn().mockResolvedValue({
+    kind: 'ok',
+    radius: { km: 10, defaultKm: 10, minKm: 1, maxKm: 50, stepKm: 1 },
+    offers: [],
+  }),
   updateMyLanguage: jest.fn().mockResolvedValue(true),
   listApplications: jest.fn().mockResolvedValue({ kind: 'ok', applications: [] }),
   decideApplication: jest.fn(),

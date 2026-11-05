@@ -23,6 +23,9 @@ const vendorProfile = {
   latitude: 30.0381,
   longitude: 31.2122,
   contact: '01012345678',
+  // D-62: opening hours are required; the whole day keeps them out of the way of these tests.
+  opensAt: '00:00',
+  closesAt: '23:59',
 };
 
 const partnerProfile = {

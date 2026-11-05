@@ -1,5 +1,5 @@
 // Home screen after login (US-04), one per role group: consumer, vendor, partner (charity, composting, other) and
-// administrator. The consumer, vendor and partner homes are placeholders until their stories (US-10 onwards).
+// administrator. The consumer home is the map of nearby offers (US-26, D-65); the partner home is a placeholder.
 // E-ACC-05: a Pending or Rejected vendor or partner sees the application status and no food functions.
 // E-ACC-06: a Suspended account sees that it is suspended. The administrator home lists Pending applications (US-07).
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { roleGroupOf, useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { ApplicationsList } from '@/components/ApplicationsList';
+import { ConsumerHome } from '@/components/ConsumerHome';
 import { Notice } from '@/components/Notice';
 import { HomeHeader } from '@/components/HomeHeader';
 import { Screen } from '@/components/Screen';
@@ -87,6 +88,17 @@ export default function HomeScreen() {
     );
   }
 
+  // D-65: the consumer home is a full-screen map with a panel at the bottom, so it does not scroll.
+  if (group === 'consumer') {
+    return (
+      <Screen edges={EDGES} header={<HomeHeader />}>
+        <View testID="home-consumer" style={styles.fill}>
+          <ConsumerHome />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll edges={EDGES} header={<HomeHeader />}>
       <View testID={`home-${group}`} style={box}>
@@ -103,5 +115,8 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: spacing.lg,
+  },
+  fill: {
+    flex: 1,
   },
 });

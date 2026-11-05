@@ -26,6 +26,13 @@ jest.mock('@/api/client', () => ({
   getListing: jest.fn(),
   getMyListings: jest.fn(),
   downloadListingPhoto: jest.fn(),
+  // D-72: a Draft goes straight to its destinations.
+  getDestinations: jest.fn().mockResolvedValue({
+    kind: 'ok',
+    destinations: { options: [], recommended: null, timeLeftMinutes: 60 },
+  }),
+  chooseDestination: jest.fn(),
+  markUnfit: jest.fn(),
 }));
 
 const store = (SecureStore as unknown as { __secureStore: Map<string, string> }).__secureStore;
@@ -43,6 +50,9 @@ const SHOP: Shop = {
   address: '12 Tahrir Street, Dokki',
   latitude: 30.0381,
   longitude: 31.2122,
+  opensAt: '00:00',
+  closesAt: '23:59',
+  branches: [],
 };
 
 function listing(overrides: Partial<Listing> = {}): Listing {
@@ -54,18 +64,22 @@ function listing(overrides: Partial<Listing> = {}): Listing {
     foodType: 'Baladi bread',
     foodCategory: 'bread_and_baked_goods',
     photoKey: 'k.jpg',
+    nameAr: 'عيش بلدي',
+    nameEn: 'Baladi bread',
     descriptionAr: 'خبز بلدي طازج',
     descriptionEn: 'Fresh baladi bread',
+    sourceLanguage: 'en',
+    branchId: null,
     bagsTotal: 3,
     bagsAvailable: 3,
     originalValue: 100,
     price: 40,
     pickupStart: '2026-11-01T11:00:00.000Z',
     pickupEnd: '2026-11-01T13:00:00.000Z',
-    prepTime: '2026-11-01T08:00:00.000Z',
     storage: 'room_temperature',
-    expiryAt: '2026-11-01T18:00:00.000Z',
     perishabilityCategory: null,
+    urgency: null,
+    unfitForPeople: false,
     latitude: SHOP.latitude,
     longitude: SHOP.longitude,
     ...overrides,
@@ -78,13 +92,15 @@ const QUICK = listing({
   isQuickPost: true,
   foodType: null,
   foodCategory: 'unknown',
+  // A Quick Post from before D-63: no name, so it is shown as "Quick Post".
+  nameAr: null,
+  nameEn: null,
   descriptionAr: null,
   descriptionEn: null,
+  sourceLanguage: null,
   originalValue: null,
   price: 15,
-  prepTime: null,
   storage: null,
-  expiryAt: null,
 });
 
 beforeEach(async () => {
@@ -154,11 +170,29 @@ describe('FR-LST-06 the vendor views their listings (US-15)', () => {
     expect(app.getPathname()).toBe('/listings/l1');
   });
 
-  test('FR-LST-06 a vendor with no listings is told so and can create one', async () => {
+  // Found on the phone (2026-11-04): an informal vendor was sent to Create listing, which is for formal vendors (D-64).
+  test('FR-LST-02 D-64 an informal vendor with no listings is told so and offered Quick Post only', async () => {
     mocked.mine.mockResolvedValue({ kind: 'ok', listings: [] });
     const app = await openMyListings();
 
-    expect(await screen.findByText(/You have no listings yet/)).toBeOnTheScreen();
+    expect(
+      await screen.findByText('You have no listings yet. Use Quick Post to post surplus food.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Create listing' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Quick Post' }));
+    expect(await screen.findByTestId('quick-post-form')).toBeOnTheScreen();
+    expect(app.getPathname()).toBe('/listings/quick');
+  });
+
+  test('FR-LST-06 a formal vendor with no listings is told so and offered Create listing only', async () => {
+    mocked.getShop.mockResolvedValue({ kind: 'ok', shop: { ...SHOP, vendorType: 'formal' } });
+    mocked.mine.mockResolvedValue({ kind: 'ok', listings: [] });
+    const app = await openMyListings();
+
+    expect(
+      await screen.findByText('You have no listings yet. Use Create listing to post surplus food.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Quick Post' })).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Create listing' }));
     expect(await screen.findByTestId('listing-form')).toBeOnTheScreen();
     expect(app.getPathname()).toBe('/listings/new');

@@ -1,6 +1,9 @@
 // Small helpers shared by the listing form (US-10, US-13) and Quick Post (US-11).
 import { PHOTO_MAX_BYTES } from '@nowaste/shared';
-import { uploadListingPhoto } from '@/api/client';
+import type { TFunction } from 'i18next';
+import type { Language } from '@nowaste/shared';
+import { uploadListingPhoto, type SaveListingResult } from '@/api/client';
+import { formatDateTime } from './formatDateTime';
 import { compressPhoto } from './compressPhoto';
 
 /** A number typed in the form, also with Arabic-Indic digits and the Arabic decimal mark; undefined if not a number. */
@@ -33,4 +36,34 @@ export async function preparePhoto(token: string, uri: string): Promise<PhotoUpl
   const result = await uploadListingPhoto(token, small);
   // No connection or an unexpected answer is a failed upload: the form offers Retry (E-LST-02).
   return result.kind === 'unreachable' || result.kind === 'unexpected' ? { kind: 'failed' } : result;
+}
+
+/** A message for one pickup field that comes with the server's answer. */
+export interface PickupNote {
+  field: 'pickupStart' | 'pickupEnd';
+  message: string;
+}
+
+/**
+ * The server's answer as a message on the pickup field, when it carries one: the pickup is outside the shop's
+ * opening hours (D-62, E-LST-04 with the hours) or ends after the food limit (D-61, E-LST-03 with the latest end).
+ */
+export function pickupNoteFor(
+  result: SaveListingResult,
+  t: TFunction,
+  language: Language,
+): PickupNote | null {
+  if (result.kind === 'invalid' && result.hours !== undefined) {
+    return {
+      field: result.fields.includes('pickupStart') ? 'pickupStart' : 'pickupEnd',
+      message: t('listing.errors.outsideHours', result.hours),
+    };
+  }
+  if (result.kind === 'afterExpiry' && result.latestPickupEnd !== undefined) {
+    return {
+      field: 'pickupEnd',
+      message: t('listing.errors.afterLimit', { time: formatDateTime(result.latestPickupEnd, language) }),
+    };
+  }
+  return null;
 }

@@ -14,25 +14,10 @@ import { MapView, type Coordinates } from './MapView';
 import { Notice } from './Notice';
 import { TextField } from './TextField';
 import { useLanguage } from '@/i18n/LanguageProvider';
+import { FALLBACK_CENTER, readDevicePosition } from '@/location/devicePosition';
 import { spacing } from '@/theme';
 
-// Where the map opens when there is no GPS position: central Cairo (decision D-25). Only a starting view;
-// nothing is saved until the user places the pin.
-const FALLBACK_CENTER: Coordinates = { latitude: 30.0444, longitude: 31.2357 };
-
 type GpsState = 'asking' | 'found' | 'unavailable';
-
-/** The device GPS position, or null when permission is denied or no position is found. */
-async function readDevicePosition(): Promise<Coordinates | null> {
-  try {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== 'granted') return null;
-    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { latitude: position.coords.latitude, longitude: position.coords.longitude };
-  } catch {
-    return null;
-  }
-}
 
 // One line from the parts the device geocoder returns, for example "12 Tahrir Street, Dokki, Giza".
 function formatAddress(found: Location.LocationGeocodedAddress): string {

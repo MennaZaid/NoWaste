@@ -1,6 +1,7 @@
 // C-27 Data Access: vendor and partner applications (SDD 4.2 "VendorProfile" and "PartnerProfile").
 // The user and the profile are written in one transaction, so a failed profile leaves no user behind.
 import type { PoolClient } from 'pg';
+import { insertBranch, type NewBranch } from './branchRepository.js';
 import type { FoodCategory, PartnerRole, VendorType } from '@nowaste/shared';
 import { getPool } from './db.js';
 import { withTransaction } from './db.js';
@@ -23,6 +24,11 @@ export interface NewVendorProfile extends MapPin {
   vendorType: VendorType;
   contact: string;
   description?: string | null;
+  /** D-62: optional opening hours "HH:MM"; both or neither. */
+  opensAt?: string | null;
+  closesAt?: string | null;
+  /** D-64: more branches besides the main shop. D-69: they carry the shop name. */
+  branches?: Omit<NewBranch, 'name'>[];
 }
 
 export interface NewPartnerProfile extends MapPin {
@@ -38,9 +44,21 @@ const point = (lon: string, lat: string) => `ST_SetSRID(ST_MakePoint(${lon}, ${l
 
 async function insertVendorProfile(client: PoolClient, userId: string, p: NewVendorProfile): Promise<void> {
   await client.query(
-    `INSERT INTO vendor_profiles (user_id, shop_name, vendor_type, address, location, contact, description)
-     VALUES ($1, $2, $3, $4, ${point('$5', '$6')}, $7, $8)`,
-    [userId, p.shopName, p.vendorType, p.address, p.longitude, p.latitude, p.contact, p.description ?? null],
+    `INSERT INTO vendor_profiles (user_id, shop_name, vendor_type, address, location, contact, description,
+       opens_at, closes_at)
+     VALUES ($1, $2, $3, $4, ${point('$5', '$6')}, $7, $8, $9, $10)`,
+    [
+      userId,
+      p.shopName,
+      p.vendorType,
+      p.address,
+      p.longitude,
+      p.latitude,
+      p.contact,
+      p.description ?? null,
+      p.opensAt ?? null,
+      p.closesAt ?? null,
+    ],
   );
 }
 
@@ -68,6 +86,22 @@ export function insertVendorApplication(user: NewUser, profile: NewVendorProfile
   return withTransaction(async (client) => {
     const created = await insertUser(user, client);
     await insertVendorProfile(client, created.id, profile);
+    // D-64: the shop itself is the first branch, then the extra branches in the order given.
+    await insertBranch(
+      created.id,
+      {
+        name: profile.shopName,
+        address: profile.address,
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        opensAt: profile.opensAt ?? null,
+        closesAt: profile.closesAt ?? null,
+      },
+      client,
+    );
+    for (const branch of profile.branches ?? []) {
+      await insertBranch(created.id, { ...branch, name: profile.shopName }, client);
+    }
     return created;
   });
 }

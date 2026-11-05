@@ -1,17 +1,23 @@
-// SDD IApi: listing routes (US-10, US-11, US-13). The routes read the body and call the Listing Service; roles and
-// approval (E-LST-06) are checked by protectedRoutes.ts.
+// SDD IApi: listing and shop routes (US-10, US-11, US-13, D-63, D-64, D-66). The routes read the body and call the Listing
+// Service; roles and approval (E-LST-06) are checked by protectedRoutes.ts.
 import express, { type RequestHandler } from 'express';
 import { PHOTO_MAX_BYTES } from '@nowaste/shared';
 import {
+  addBranch,
   createListing,
   createQuickPost,
+  previewPickBy,
+  updateBranchHours,
   getListing,
   getListingPhoto,
   getMyListings,
   getShop,
   publishListing,
+  updateOpeningHours,
   uploadPhoto,
 } from '../../services/listing/listingService.js';
+import { estimateListing } from '../../services/perishability/perishabilityService.js';
+import { chooseDestination, getDestinations, markUnfit } from '../../services/routing/routingService.js';
 import { SrsError } from '../../domain/errors.js';
 import { authOf } from '../middleware/auth.js';
 
@@ -40,32 +46,68 @@ export const uploadPhotoHandler: RequestHandler = (req, res, next) => {
   });
 };
 
-/** POST /listings: a full listing saved as a Draft. */
+/** POST /listings: a full listing saved as a Draft (D-63, D-64: no pickup end, preparation time or expiry). */
 export const createListingHandler: RequestHandler = async (req, res) => {
   const b = bodyOf(req.body);
   const listing = await createListing(authOf(res).user.id, {
     photoKey: b.photoKey,
-    foodType: b.foodType,
+    name: b.name,
+    description: b.description,
+    language: b.language,
     foodCategory: b.foodCategory,
-    descriptionAr: b.descriptionAr,
-    descriptionEn: b.descriptionEn,
+    storage: b.storage,
     bagsTotal: b.bagsTotal,
     originalValue: b.originalValue,
     price: b.price,
     pickupStart: b.pickupStart,
     pickupEnd: b.pickupEnd,
-    prepTime: b.prepTime,
-    storage: b.storage,
-    expiryAt: b.expiryAt,
-    location: b.location,
+    branchId: b.branchId,
   });
   res.status(201).json(listing);
 };
 
-/** POST /listings/quick: only photo, bags, price and pickup end time are read (FR-LST-02). */
+/** POST /listings/pick-by: the pick-by time a listing would get (D-64), shown in the form before saving. */
+export const previewPickByHandler: RequestHandler = async (req, res) => {
+  const { foodCategory, storage, pickupStart, branchId } = bodyOf(req.body);
+  res.json(await previewPickBy(authOf(res).user.id, { foodCategory, storage, pickupStart, branchId }));
+};
+
+/**
+ * POST /listings/quick: photo, name, description, optional food category (D-68), bags, price, optional pickup start
+ * (D-75) and pickup end time.
+ */
 export const createQuickPostHandler: RequestHandler = async (req, res) => {
-  const { photoKey, bagsTotal, price, pickupEnd } = bodyOf(req.body);
-  res.status(201).json(await createQuickPost(authOf(res).user.id, { photoKey, bagsTotal, price, pickupEnd }));
+  const { photoKey, name, description, language, foodCategory, bagsTotal, price, pickupStart, pickupEnd } =
+    bodyOf(req.body);
+  res.status(201).json(
+    await createQuickPost(authOf(res).user.id, {
+      photoKey,
+      name,
+      description,
+      language,
+      // D-68: optional.
+      foodCategory,
+      bagsTotal,
+      price,
+      // D-75: optional; without it the pickup starts now.
+      pickupStart,
+      pickupEnd,
+    }),
+  );
+};
+
+/** POST /vendors/me/branches: adds a branch (D-64). */
+export const addBranchHandler: RequestHandler = async (req, res) => {
+  const { name, address, latitude, longitude, opensAt, closesAt } = bodyOf(req.body);
+  res
+    .status(201)
+    .json(await addBranch(authOf(res).user.id, { name, address, latitude, longitude, opensAt, closesAt }));
+};
+
+/** PATCH /vendors/me/branches/:id {opensAt, closesAt}: a branch's opening hours (D-64). */
+export const updateBranchHoursHandler: RequestHandler = async (req, res) => {
+  const { opensAt, closesAt } = bodyOf(req.body);
+  res.json(await updateBranchHours(authOf(res).user.id, String(req.params.id), { opensAt, closesAt }));
 };
 
 export const getListingHandler: RequestHandler = async (req, res) => {
@@ -85,6 +127,32 @@ export const getListingPhotoHandler: RequestHandler = async (req, res) => {
 
 export const publishListingHandler: RequestHandler = async (req, res) => {
   res.json(await publishListing(authOf(res).user.id, String(req.params.id)));
+};
+
+/** POST /listings/:id/perishability/estimate (US-18, FR-RTE-01, FR-RTE-02, E-RTE-01). */
+export const estimatePerishabilityHandler: RequestHandler = async (req, res) => {
+  res.json(await estimateListing(authOf(res).user.id, String(req.params.id)));
+};
+
+/** GET /listings/:id/destinations (US-19, FR-RTE-05, FR-RTE-07, E-RTE-02). */
+export const getDestinationsHandler: RequestHandler = async (req, res) => {
+  res.json(await getDestinations(authOf(res).user.id, String(req.params.id)));
+};
+
+/** POST /listings/:id/destination {destination} (US-19, FR-RTE-06). */
+export const chooseDestinationHandler: RequestHandler = async (req, res) => {
+  res.json(await chooseDestination(authOf(res).user.id, String(req.params.id), bodyOf(req.body).destination));
+};
+
+/** POST /listings/:id/unfit {unfitForPeople} (US-19, FR-RTE-07). */
+export const markUnfitHandler: RequestHandler = async (req, res) => {
+  res.json(await markUnfit(authOf(res).user.id, String(req.params.id), bodyOf(req.body).unfitForPeople));
+};
+
+/** PATCH /vendors/me {opensAt, closesAt}: the shop's opening hours (D-62). */
+export const updateShopHandler: RequestHandler = async (req, res) => {
+  const { opensAt, closesAt } = bodyOf(req.body);
+  res.json(await updateOpeningHours(authOf(res).user.id, { opensAt, closesAt }));
 };
 
 /** GET /vendors/me: the shop details the listing form needs (pickup pin, Quick Post for informal vendors). */

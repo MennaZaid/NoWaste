@@ -50,6 +50,17 @@ describe('NFR-06 Arabic and English texts', () => {
     expect(empty).toEqual([]);
   });
 
+  // US-18 (IF-UI-05): the perishability category tells how soon to collect, never that the food is safe.
+  test('NFR-05a no text in en.json or ar.json says the food is safe', () => {
+    const english = /\bsafe\b|\bsafely\b|fit to eat|good to eat/i;
+    const arabic = /آمن|سليم|صالح للأكل|صالح للاستهلاك/;
+    const offenders = [
+      ...Object.entries(enKeys).filter(([, v]) => english.test(v)),
+      ...Object.entries(arKeys).filter(([, v]) => arabic.test(v)),
+    ].map(([k]) => k);
+    expect(offenders).toEqual([]);
+  });
+
   test('NFR-06 app styles use start/end, never left/right, so layouts mirror in Arabic', () => {
     const appRoot = join(__dirname, '..');
     const forbidden =

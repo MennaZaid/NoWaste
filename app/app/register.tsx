@@ -22,10 +22,12 @@ import {
   type PartnerRole,
   type SignUpField,
   type VendorType,
+  type BranchField,
 } from '@nowaste/shared';
 import { registerConsumer, submitApplication, type ApplicationRequest } from '@/api/client';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { BranchForm, EMPTY_BRANCH, branchBody, type BranchDraft } from '@/components/BranchForm';
 import { LocationPicker } from '@/components/LocationPicker';
 import type { Coordinates } from '@/components/MapView';
 import { Notice } from '@/components/Notice';
@@ -34,6 +36,8 @@ import { PasswordRules } from '@/components/PasswordRules';
 import { Screen } from '@/components/Screen';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { TextField } from '@/components/TextField';
+import { TimeField } from '@/components/TimeField';
+import { hoursErrorKey } from '@/listings/clockTime';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { spacing } from '@/theme';
 
@@ -62,6 +66,11 @@ export default function RegisterScreen() {
   const [vendorType, setVendorType] = useState<VendorType>('formal');
   const [contact, setContact] = useState('');
   const [description, setDescription] = useState('');
+  // D-62: required opening hours, picked on a clock ("HH:MM").
+  const [opensAt, setOpensAt] = useState('');
+  const [closesAt, setClosesAt] = useState('');
+  // D-64: optional extra branches, each with its own pin and opening hours.
+  const [branches, setBranches] = useState<BranchDraft[]>([]);
   const [organisationName, setOrganisationName] = useState('');
   const [otherPartnerType, setOtherPartnerType] = useState('');
   const [foodTypes, setFoodTypes] = useState<AcceptedFoodType[]>([]);
@@ -131,7 +140,17 @@ export default function RegisterScreen() {
       return {
         ...login,
         role: 'vendor',
-        vendorProfile: { shopName, vendorType, contact, description, ...where },
+        vendorProfile: {
+          shopName,
+          vendorType,
+          contact,
+          description,
+          ...where,
+          // D-62: required opening hours.
+          opensAt,
+          closesAt,
+          branches: branches.map(branchBody),
+        },
       };
     }
     return {
@@ -325,6 +344,27 @@ export default function RegisterScreen() {
               </AppText>
             }
           />
+          <TimeField
+            testID="register-opens-at"
+            label={t('vendor.opensAtLabel')}
+            value={opensAt === '' ? null : opensAt}
+            onChange={(time) => {
+              setOpensAt(time);
+              clearField('opensAt');
+            }}
+            error={invalid.includes('opensAt') ? t(hoursErrorKey('opensAt', opensAt, closesAt)) : undefined}
+          />
+          <TimeField
+            testID="register-closes-at"
+            label={t('vendor.closesAtLabel')}
+            hint={t('vendor.hoursHint')}
+            value={closesAt === '' ? null : closesAt}
+            onChange={(time) => {
+              setClosesAt(time);
+              clearField('closesAt');
+            }}
+            error={invalid.includes('closesAt') ? t(hoursErrorKey('closesAt', opensAt, closesAt)) : undefined}
+          />
         </>
       ) : null}
 
@@ -411,6 +451,55 @@ export default function RegisterScreen() {
             TEXT_LIMITS.address,
           )}
         />
+      ) : null}
+
+      {form === 'vendor' ? (
+        <View testID="register-branches" style={styles.branches}>
+          <AppText variant="heading" accessibilityRole="header">
+            {t('branches.signUpTitle')}
+          </AppText>
+          <AppText variant="caption" color="textMuted">
+            {t('branches.signUpHint')}
+          </AppText>
+          {branches.map((branch, index) => {
+            const prefix = `branches.${String(index)}.`;
+            const branchInvalid = invalid
+              .filter((f) => f.startsWith(prefix))
+              .map((f) => f.slice(prefix.length) as BranchField);
+            return (
+              <View key={index} style={styles.branches}>
+                <BranchForm
+                  testID={`register-branch-${String(index)}`}
+                  title={t('branches.numbered', { number: index + 2 })}
+                  value={branch}
+                  invalid={branchInvalid}
+                  onChange={(changed, edited) => {
+                    setBranches((current) => current.map((b, i) => (i === index ? { ...b, ...changed } : b)));
+                    clearField(...edited.map((f) => `${prefix}${f}` as SignUpField));
+                  }}
+                />
+                <Button
+                  testID={`register-branch-${String(index)}-remove`}
+                  variant="secondary"
+                  label={t('branches.remove')}
+                  onPress={() => {
+                    setBranches((current) => current.filter((_, i) => i !== index));
+                    // Field marks after this branch would point at the wrong branch now.
+                    setInvalid((fields) => fields.filter((f) => !f.startsWith('branches.')));
+                  }}
+                />
+              </View>
+            );
+          })}
+          <Button
+            testID="register-add-branch"
+            variant="secondary"
+            label={t('branches.add')}
+            onPress={() => {
+              setBranches((current) => [...current, EMPTY_BRANCH]);
+            }}
+          />
+        </View>
       ) : null}
 
       {isPartner ? (
@@ -556,6 +645,9 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   group: {
     gap: spacing.sm,
+  },
+  branches: {
+    gap: spacing.md,
   },
   duplicateActions: {
     flexDirection: 'row',

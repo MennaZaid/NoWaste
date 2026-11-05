@@ -6,14 +6,24 @@ import { ROLE_GROUPS, type RoleGroup } from '../../domain/roles.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { decideHandler, listApplicationsHandler } from './admin.js';
 import { logoutHandler } from './auth.js';
+import { nearbyOffersHandler, offerHandler, offerPhotoHandler } from './feed.js';
+import { categoryHoursHandler } from './perishability.js';
 import {
+  addBranchHandler,
+  chooseDestinationHandler,
   createListingHandler,
+  estimatePerishabilityHandler,
+  getDestinationsHandler,
+  markUnfitHandler,
+  previewPickByHandler,
+  updateBranchHoursHandler,
   createQuickPostHandler,
   getListingHandler,
   getListingPhotoHandler,
   getMyListingsHandler,
   getShopHandler,
   publishListingHandler,
+  updateShopHandler,
   uploadPhotoHandler,
 } from './listings.js';
 import { getMeHandler, patchMeHandler } from './users.js';
@@ -37,6 +47,8 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   { method: 'post', path: '/auth/logout', roles: EVERYONE, handler: logoutHandler },
   { method: 'get', path: '/users/me', roles: EVERYONE, handler: getMeHandler },
   { method: 'patch', path: '/users/me', roles: EVERYONE, handler: patchMeHandler },
+  // D-70: what each perishability category means in hours (BR-01).
+  { method: 'get', path: '/perishability/categories', roles: EVERYONE, handler: categoryHoursHandler },
   { method: 'get', path: '/admin/applications', roles: ['admin'], handler: listApplicationsHandler },
   {
     method: 'post',
@@ -52,13 +64,38 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   },
   // US-10, US-11, US-13 (SDD C-05).
   { method: 'get', path: '/vendors/me', roles: ['vendor'], handler: getShopHandler },
+  // D-62: the vendor sets the shop's opening hours.
+  { method: 'patch', path: '/vendors/me', roles: ['vendor'], handler: updateShopHandler },
+  // D-64: the vendor's branches.
+  { method: 'post', path: '/vendors/me/branches', roles: ['vendor'], handler: addBranchHandler },
+  { method: 'patch', path: '/vendors/me/branches/:id', roles: ['vendor'], handler: updateBranchHoursHandler },
+  { method: 'post', path: '/listings/pick-by', ...APPROVED_VENDOR, handler: previewPickByHandler },
   { method: 'post', path: '/listings/photo', ...APPROVED_VENDOR, handler: uploadPhotoHandler },
   { method: 'post', path: '/listings/quick', ...APPROVED_VENDOR, handler: createQuickPostHandler },
   { method: 'post', path: '/listings', ...APPROVED_VENDOR, handler: createListingHandler },
+  // US-26 (FR-RES-01, D-65): consumers browse offers near them. Before /listings/:id, which would match "nearby".
+  { method: 'get', path: '/listings/nearby', roles: ['consumer'], handler: nearbyOffersHandler },
+  { method: 'get', path: '/listings/nearby/:id', roles: ['consumer'], handler: offerHandler },
+  { method: 'get', path: '/listings/nearby/:id/photo', roles: ['consumer'], handler: offerPhotoHandler },
   { method: 'get', path: '/listings/:id', roles: ['vendor'], handler: getListingHandler },
   // US-15 (FR-LST-06) and the listing photo: a vendor sees only their own listings.
   { method: 'get', path: '/listings', roles: ['vendor'], handler: getMyListingsHandler },
   { method: 'get', path: '/listings/:id/photo', roles: ['vendor'], handler: getListingPhotoHandler },
+  // US-18 (SDD C-06) and US-19 (SDD C-07): only Approved vendors change a listing before publishing (E-LST-06).
+  {
+    method: 'post',
+    path: '/listings/:id/perishability/estimate',
+    ...APPROVED_VENDOR,
+    handler: estimatePerishabilityHandler,
+  },
+  { method: 'get', path: '/listings/:id/destinations', ...APPROVED_VENDOR, handler: getDestinationsHandler },
+  {
+    method: 'post',
+    path: '/listings/:id/destination',
+    ...APPROVED_VENDOR,
+    handler: chooseDestinationHandler,
+  },
+  { method: 'post', path: '/listings/:id/unfit', ...APPROVED_VENDOR, handler: markUnfitHandler },
   { method: 'post', path: '/listings/:id/publish', ...APPROVED_VENDOR, handler: publishListingHandler },
 ];
 

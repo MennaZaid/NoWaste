@@ -1,7 +1,9 @@
 // The vendor's listing after saving (US-10, US-11) or from My listings (US-15): its photo, details and status (D-51).
-// A Draft can be published here
-// (Draft → Active). Turn 5 adds the perishability confirmation (US-18) and the destination (US-19) before this step.
-import { useEffect, useState } from 'react';
+// A full Draft is published here (Draft → Active) after the vendor confirms the perishability category (US-18) and
+// chooses a destination (US-19) in PublishSteps; Publish stays disabled until both are done (FR-RTE-03, FR-RTE-06).
+// The confirmed category is shown; the pickup urgency is not repeated here, because it is the pickup end shown above
+// (D-69). Customers see it with the category (FR-RTE-04, IF-UI-05).
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -11,12 +13,18 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { ListingPhoto } from '@/components/ListingPhoto';
 import { formatDateTime } from '@/listings/formatDateTime';
+import { listingText } from '@/listings/listingText';
+import { useCategoryHours } from '@/listings/categoryHours';
+import { categoryWithHours, listingTypeText } from '@/listings/perishabilityText';
+import { PublishSteps } from '@/listings/PublishSteps';
+import { QuickPostDestination } from '@/listings/QuickPostDestination';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { localDigits } from '@/i18n/digits';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { colors, radius, spacing } from '@/theme';
 
-type Problem = 'notApproved' | 'notDraft' | 'unreachable' | 'unexpected' | 'notFound';
+type Problem = 'notApproved' | 'notDraft' | 'notReady' | 'unreachable' | 'unexpected' | 'notFound';
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -33,6 +41,7 @@ export default function ListingScreen() {
   const { t } = useTranslation();
   const { direction, language } = useLanguage();
   const { token, signOut } = useAuth();
+  const hours = useCategoryHours();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [listing, setListing] = useState<Listing | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
@@ -54,6 +63,10 @@ export default function ListingScreen() {
     };
   }, [token, id, signOut]);
 
+  const sessionEnded = useCallback(() => {
+    void signOut();
+  }, [signOut]);
+
   if (token === null) return <Redirect href="/" />;
   const session = token;
 
@@ -72,6 +85,7 @@ export default function ListingScreen() {
     }
   }
 
+  const text = listing === null ? null : listingText(listing, language);
   const time = (iso: string | null) =>
     iso === null
       ? t('listing.notAsked')
@@ -104,7 +118,10 @@ export default function ListingScreen() {
               listingId={listing.id}
               style={styles.photo}
             />
-            <Row label={t('listing.foodTypeLabel')} value={listing.foodType ?? t('quickPost.title')} />
+            <Row label={t('listing.nameLabel')} value={text?.name ?? t('quickPost.title')} />
+            {text?.description != null ? (
+              <Row label={t('listing.descriptionLabel')} value={text.description} />
+            ) : null}
             <Row
               label={t('listing.categoryLabel')}
               value={
@@ -113,13 +130,7 @@ export default function ListingScreen() {
                   : t(`foodCategories.${listing.foodCategory}`)
               }
             />
-            {listing.descriptionAr !== null ? (
-              <Row label={t('listing.descriptionArLabel')} value={listing.descriptionAr} />
-            ) : null}
-            {listing.descriptionEn !== null ? (
-              <Row label={t('listing.descriptionEnLabel')} value={listing.descriptionEn} />
-            ) : null}
-            <Row label={t('listing.bagsLabel')} value={String(listing.bagsTotal)} />
+            <Row label={t('listing.bagsLabel')} value={localDigits(listing.bagsTotal, language)} />
             {listing.originalValue !== null ? (
               <Row
                 label={t('listing.originalValueLabel')}
@@ -128,27 +139,55 @@ export default function ListingScreen() {
             ) : null}
             <Row label={t('listing.priceLabel')} value={t('listing.egp', { amount: listing.price })} />
             <Row label={t('listing.pickupStartLabel')} value={time(listing.pickupStart)} />
-            <Row label={t('listing.pickupEndLabel')} value={time(listing.pickupEnd)} />
+            <Row
+              label={listing.isQuickPost ? t('listing.pickupEndLabel') : t('listing.pickByLabel')}
+              value={time(listing.pickupEnd)}
+            />
             {!listing.isQuickPost ? (
-              <>
-                <Row label={t('listing.prepTimeLabel')} value={time(listing.prepTime)} />
-                <Row
-                  label={t('listing.storageLabel')}
-                  value={
-                    listing.storage === null ? t('listing.notAsked') : t(`listing.storage.${listing.storage}`)
-                  }
-                />
-                <Row label={t('listing.expiryLabel')} value={time(listing.expiryAt)} />
-              </>
+              <Row
+                label={t('listing.storageLabel')}
+                value={
+                  listing.storage === null ? t('listing.notAsked') : t(`listing.storage.${listing.storage}`)
+                }
+              />
+            ) : null}
+            {listing.perishabilityCategory !== null ? (
+              <Row
+                label={t('perishability.categoryLabel')}
+                value={categoryWithHours(t, listing.perishabilityCategory, hours)}
+              />
+            ) : null}
+            {listing.listingType !== null ? (
+              <Row label={t('routing.listingTypeLabel')} value={listingTypeText(t, listing.listingType)} />
+            ) : null}
+            {listing.isQuickPost && listing.status === 'Active' ? (
+              <QuickPostDestination
+                token={session}
+                listing={listing}
+                onChange={setListing}
+                onSessionEnded={sessionEnded}
+              />
             ) : null}
             {listing.status === 'Draft' ? (
-              <Button
-                testID="listing-publish"
-                label={t('listing.publish')}
-                busyLabel={t('listing.publishing')}
-                busy={publishing}
-                onPress={() => void publish()}
-              />
+              <>
+                <PublishSteps
+                  token={session}
+                  listing={listing}
+                  onChange={setListing}
+                  onSessionEnded={sessionEnded}
+                />
+                {listing.perishabilityCategory === null || listing.listingType === null ? (
+                  <AppText color="textMuted">{t('listing.publishNeeds')}</AppText>
+                ) : null}
+                <Button
+                  testID="listing-publish"
+                  label={t('listing.publish')}
+                  busyLabel={t('listing.publishing')}
+                  busy={publishing}
+                  disabled={listing.perishabilityCategory === null || listing.listingType === null}
+                  onPress={() => void publish()}
+                />
+              </>
             ) : null}
           </>
         )}

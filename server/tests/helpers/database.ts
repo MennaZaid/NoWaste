@@ -98,3 +98,74 @@ export async function countLoginAttempts(userId: string): Promise<number> {
   );
   return Number(result.rows[0]?.count ?? 0);
 }
+
+/** The value of a settings row (for tests that change a rule and put it back). */
+export async function readSettingValue(key: string): Promise<unknown> {
+  const result = await getPool().query<{ value: unknown }>('SELECT value FROM settings WHERE key = $1', [
+    key,
+  ]);
+  return result.rows[0]?.value;
+}
+
+export async function setSettingValue(key: string, value: unknown): Promise<void> {
+  await getPool().query('UPDATE settings SET value = $2 WHERE key = $1', [key, JSON.stringify(value)]);
+}
+
+export async function listPerishabilityRules(): Promise<
+  { foodCategory: string; storage: string; shelfLifeHours: number | null }[]
+> {
+  const result = await getPool().query<{
+    foodCategory: string;
+    storage: string;
+    shelfLifeHours: number | null;
+  }>(
+    `SELECT food_category::text AS "foodCategory", storage, shelf_life_hours::float8 AS "shelfLifeHours"
+     FROM perishability_rules ORDER BY food_category, storage`,
+  );
+  return result.rows;
+}
+
+export async function setShelfLife(
+  foodCategory: string,
+  storage: string,
+  hours: number | null,
+): Promise<void> {
+  await getPool().query(
+    'UPDATE perishability_rules SET shelf_life_hours = $3 WHERE food_category = $1 AND storage = $2',
+    [foodCategory, storage, hours],
+  );
+}
+
+/** D-70: clears the category of a listing, like a Draft saved before the category was set on saving. */
+export async function clearListingCategory(listingId: string): Promise<void> {
+  await getPool().query('UPDATE listings SET perishability_category = NULL WHERE id = $1', [listingId]);
+}
+
+/** D-65: sets the bags left of a listing (for example 0: sold out). */
+export async function setBagsAvailable(listingId: string, bags: number): Promise<void> {
+  await getPool().query('UPDATE listings SET bags_available = $2 WHERE id = $1', [listingId, bags]);
+}
+
+export async function setUnfitForPeople(listingId: string, unfit: boolean): Promise<void> {
+  await getPool().query('UPDATE listings SET unfit_for_people = $2 WHERE id = $1', [listingId, unfit]);
+}
+
+/** D-62: the stored opening hours of a vendor (PostgreSQL TIME, as text). */
+export async function readOpeningHours(userId: string) {
+  const result = await getPool().query<{ opensAt: string | null; closesAt: string | null }>(
+    'SELECT opens_at::text AS "opensAt", closes_at::text AS "closesAt" FROM vendor_profiles WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0];
+}
+
+/** D-62: removes a vendor's opening hours, like a vendor registered before they were required. */
+export async function clearOpeningHours(userId: string): Promise<void> {
+  await getPool().query('UPDATE vendor_profiles SET opens_at = NULL, closes_at = NULL WHERE user_id = $1', [
+    userId,
+  ]);
+  // D-64: the vendor's branches were also registered without hours.
+  await getPool().query('UPDATE vendor_branches SET opens_at = NULL, closes_at = NULL WHERE vendor_id = $1', [
+    userId,
+  ]);
+}

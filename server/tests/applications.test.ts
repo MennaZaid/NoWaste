@@ -29,6 +29,9 @@ const vendorProfile = {
   latitude: 30.0381,
   longitude: 31.2122,
   contact: '01012345678',
+  // D-62: opening hours are required; the whole day keeps them out of the way of these tests.
+  opensAt: '00:00',
+  closesAt: '23:59',
 };
 
 const partnerProfile = {
@@ -428,7 +431,17 @@ describe('E-ACC-02 invalid application fields', () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
       error: 'E-ACC-02',
-      fields: ['shopName', 'vendorType', 'address', 'latitude', 'longitude', 'contact'],
+      // D-62: the opening hours are required too.
+      fields: [
+        'shopName',
+        'vendorType',
+        'address',
+        'latitude',
+        'longitude',
+        'contact',
+        'opensAt',
+        'closesAt',
+      ],
     });
   });
 

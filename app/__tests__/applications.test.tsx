@@ -67,6 +67,12 @@ async function fillAccount() {
   await fireEvent.changeText(screen.getByLabelText('Password'), 'abcd1234');
 }
 
+/** D-62: the required opening hours of a vendor (picking on the clock is typing in the test stand-in). */
+async function fillHours(opensAt = '09:00', closesAt = '22:00') {
+  await fireEvent.changeText(screen.getByLabelText('Opens at'), opensAt);
+  await fireEvent.changeText(screen.getByLabelText('Closes at'), closesAt);
+}
+
 async function submit() {
   await fireEvent.press(screen.getByRole('button', { name: 'Send application' }));
 }
@@ -140,6 +146,164 @@ describe('FR-ACC-02 FR-ACC-03 the account type choice shows the right form', () 
 });
 
 describe('FR-ACC-02 vendor application on the app', () => {
+  // D-62: required opening hours, picked on a clock (a text box in tests, see jest.setup.ts).
+  test('FR-ACC-02 the opening hours, also after midnight, are sent with the application', async () => {
+    mockedSubmit.mockResolvedValue({ kind: 'created', id: 'v1', status: 'Pending' });
+    grantLocation(30.0381, 31.2122);
+    await openRegisterAs('Vendor');
+    await screen.findByText('Pin: 30.03810, 31.21220');
+    await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
+    await fireEvent.press(screen.getByRole('button', { name: 'Formal' }));
+    await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
+    await fireEvent.changeText(screen.getByLabelText('Written address'), '12 Tahrir Street, Dokki');
+    await fireEvent.changeText(screen.getByLabelText('Opens at'), '18:00');
+    await fireEvent.changeText(screen.getByLabelText('Closes at'), '02:00');
+    await fillAccount();
+    await submit();
+
+    await screen.findByTestId('applied-title');
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vendorProfile: expect.objectContaining({ opensAt: '18:00', closesAt: '02:00' }) as unknown,
+      }),
+    );
+  });
+
+  /** The main shop, filled in, with GPS at the shop pin. */
+  async function fillShop() {
+    await openRegisterAs('Vendor');
+    await screen.findByText('Pin: 30.03810, 31.21220');
+    await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
+    await fireEvent.press(screen.getByRole('button', { name: 'Formal' }));
+    await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
+    await fireEvent.changeText(screen.getByLabelText('Written address'), '12 Tahrir Street, Dokki');
+    await fillHours();
+    await fillAccount();
+  }
+
+  test('FR-ACC-02 D-64 a vendor can add another branch with its own address, pin and hours', async () => {
+    mockedSubmit.mockResolvedValue({ kind: 'created', id: 'v1', status: 'Pending' });
+    grantLocation(30.0381, 31.2122);
+    await fillShop();
+    await fireEvent.press(screen.getByTestId('register-add-branch'));
+    await fireEvent.changeText(screen.getAllByLabelText('Written address')[1]!, '9 Road 9, Maadi');
+    await fireEvent.changeText(screen.getByTestId('register-branch-0-opens-at'), '08:00');
+    await fireEvent.changeText(screen.getByTestId('register-branch-0-closes-at'), '20:00');
+    await submit();
+
+    await screen.findByTestId('applied-title');
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vendorProfile: expect.objectContaining({
+          branches: [
+            {
+              address: '9 Road 9, Maadi',
+              latitude: 30.0381,
+              longitude: 31.2122,
+              opensAt: '08:00',
+              closesAt: '20:00',
+            },
+          ],
+        }) as unknown,
+      }),
+    );
+  });
+
+  // Found on the phone (2026-11-04): the address lookup that follows each pin move put the branch's old pin back, so
+  // a new branch had no pin at first and a dragged pin jumped back.
+  test('FR-ACC-02 D-64 a branch pin stays where it is placed when its address arrives', async () => {
+    mockedSubmit.mockResolvedValue({ kind: 'created', id: 'v1', status: 'Pending' });
+    grantLocation(30.0381, 31.2122);
+    await fillShop();
+    mockedReverse.mockResolvedValue([
+      { formattedAddress: 'Maadi, Cairo' } as Location.LocationGeocodedAddress,
+    ]);
+    await fireEvent.press(screen.getByTestId('register-add-branch'));
+
+    // The GPS position is the branch's first pin, and its address is written in.
+    await waitFor(() => {
+      expect(screen.getAllByLabelText('Written address')[1]).toHaveDisplayValue('Maadi, Cairo');
+    });
+    expect(screen.getAllByText('Pin: 30.03810, 31.21220')).toHaveLength(2);
+
+    // Moving the pin keeps the new spot after its address arrives.
+    await fireEvent.press(screen.getAllByTestId('map-view')[1]!);
+    await waitFor(() => {
+      expect(screen.getByText('Pin: 30.05000, 31.25000')).toBeOnTheScreen();
+    });
+    await fireEvent.changeText(screen.getByTestId('register-branch-0-opens-at'), '08:00');
+    await fireEvent.changeText(screen.getByTestId('register-branch-0-closes-at'), '20:00');
+    await submit();
+
+    await screen.findByTestId('applied-title');
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vendorProfile: expect.objectContaining({
+          branches: [expect.objectContaining({ address: 'Maadi, Cairo', latitude: 30.05, longitude: 31.25 })],
+        }) as unknown,
+      }),
+    );
+  });
+
+  test('E-ACC-02 D-64 an extra branch with missing fields is marked and nothing is sent (no name field: D-69)', async () => {
+    grantLocation();
+    await fillShop();
+    await fireEvent.press(screen.getByTestId('register-add-branch'));
+    await submit();
+
+    expect(screen.getByTestId('register-branch-0-opens-at')).toHaveProp(
+      'accessibilityHint',
+      'Choose the opening time.',
+    );
+    expect(mockedSubmit).not.toHaveBeenCalled();
+  });
+
+  test('FR-ACC-02 D-64 a branch that was added can be removed again', async () => {
+    mockedSubmit.mockResolvedValue({ kind: 'created', id: 'v1', status: 'Pending' });
+    grantLocation();
+    await fillShop();
+    await fireEvent.press(screen.getByTestId('register-add-branch'));
+    await fireEvent.press(screen.getByTestId('register-branch-0-remove'));
+    await submit();
+
+    await screen.findByTestId('applied-title');
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ vendorProfile: expect.objectContaining({ branches: [] }) as unknown }),
+    );
+  });
+
+  test('E-ACC-02 an opening time without a closing time is marked and nothing is sent', async () => {
+    grantLocation(30.0381, 31.2122);
+    await openRegisterAs('Vendor');
+    await screen.findByText('Pin: 30.03810, 31.21220');
+    await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
+    await fireEvent.press(screen.getByRole('button', { name: 'Formal' }));
+    await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
+    await fireEvent.changeText(screen.getByLabelText('Written address'), '12 Tahrir Street, Dokki');
+    await fireEvent.changeText(screen.getByLabelText('Opens at'), '09:00');
+    await fillAccount();
+    await submit();
+
+    expect(screen.getByLabelText('Closes at')).toHaveProp('accessibilityHint', 'Choose the closing time.');
+    expect(mockedSubmit).not.toHaveBeenCalled();
+  });
+
+  test('E-ACC-02 a vendor application without opening hours marks both times and is not sent', async () => {
+    grantLocation(30.0381, 31.2122);
+    await openRegisterAs('Vendor');
+    await screen.findByText('Pin: 30.03810, 31.21220');
+    await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
+    await fireEvent.press(screen.getByRole('button', { name: 'Formal' }));
+    await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
+    await fireEvent.changeText(screen.getByLabelText('Written address'), '12 Tahrir Street, Dokki');
+    await fillAccount();
+    await submit();
+
+    expect(screen.getByLabelText('Opens at')).toHaveProp('accessibilityHint', 'Choose the opening time.');
+    expect(screen.getByLabelText('Closes at')).toHaveProp('accessibilityHint', 'Choose the closing time.');
+    expect(mockedSubmit).not.toHaveBeenCalled();
+  });
+
   test('FR-ACC-02 IF-HW-03 the pin starts at the GPS location and the application is sent and shown as Pending', async () => {
     grantLocation(30.0381, 31.2122);
     mockedSubmit.mockResolvedValue({ kind: 'created', id: 'v1', status: 'Pending' });
@@ -154,6 +318,9 @@ describe('FR-ACC-02 vendor application on the app', () => {
       'Fresh bread baked daily',
     );
     await fireEvent.changeText(screen.getByLabelText('Written address'), '12 Tahrir Street, Dokki');
+    // D-62: the opening hours are required.
+    await fireEvent.changeText(screen.getByLabelText('Opens at'), '09:00');
+    await fireEvent.changeText(screen.getByLabelText('Closes at'), '22:00');
     await fillAccount();
     await submit();
 
@@ -173,6 +340,10 @@ describe('FR-ACC-02 vendor application on the app', () => {
         longitude: 31.2122,
         contact: '01012345678',
         description: 'Fresh bread baked daily',
+        opensAt: '09:00',
+        closesAt: '22:00',
+        // D-64: no extra branches; the shop itself is the main branch.
+        branches: [],
       },
     });
     expect(mockedConsumer).not.toHaveBeenCalled();
@@ -190,6 +361,7 @@ describe('FR-ACC-02 vendor application on the app', () => {
     await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
     await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
     await fireEvent.changeText(screen.getByLabelText('Written address'), 'Dokki');
+    await fillHours();
     await fillAccount();
     await submit();
 
@@ -221,6 +393,7 @@ describe('FR-ACC-02 vendor application on the app', () => {
       await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
       await fireEvent.changeText(screen.getByLabelText('Contact number'), '0223456789');
       await fireEvent.changeText(screen.getByLabelText('Written address'), 'Dokki');
+      await fillHours();
       await fillAccount();
     }
 
@@ -316,6 +489,7 @@ describe('FR-ACC-02 vendor application on the app', () => {
     await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
     await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
     await fireEvent.changeText(screen.getByLabelText('Written address'), 'Dokki');
+    await fillHours();
     await fillAccount();
     await submit();
 
@@ -331,6 +505,7 @@ describe('FR-ACC-02 vendor application on the app', () => {
     await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
     await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
     await fireEvent.changeText(screen.getByLabelText('Written address'), 'Dokki');
+    await fillHours();
     await fillAccount();
     await submit();
 
@@ -360,6 +535,7 @@ describe('IF-HW-04 location permission denied', () => {
     await fireEvent.changeText(screen.getByLabelText('Shop name'), 'Fatma Bakery');
     await fireEvent.changeText(screen.getByLabelText('Contact number'), '01012345678');
     await fireEvent.changeText(screen.getByLabelText('Written address'), 'Dokki');
+    await fillHours();
     await fillAccount();
     await submit();
 
@@ -663,7 +839,8 @@ describe('NFR-06 IF-UI-03 applications in Arabic', () => {
       expect(screen.getByRole('checkbox', { name })).toBeTruthy();
     }
 
-    await screen.findByText(/30.03810/);
+    // D-67: the pin coordinates are shown with Arabic digits.
+    await screen.findByText(/٣٠٫٠٣٨١٠/);
     await fireEvent.changeText(screen.getByLabelText('اسم الجهة'), 'بنك الطعام');
     await fireEvent.changeText(screen.getByLabelText('العنوان المكتوب'), 'كورنيش النيل');
     await fireEvent.press(screen.getByRole('checkbox', { name: 'وجبات مطبوخة' }));

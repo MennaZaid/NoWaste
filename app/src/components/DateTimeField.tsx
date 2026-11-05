@@ -19,6 +19,8 @@ interface DateTimeFieldProps {
   hint?: string;
   disabled?: boolean;
   testID?: string;
+  /** Shown while nothing is chosen, for example "Now" (D-75); otherwise "Choose a time". */
+  emptyText?: string;
 }
 
 export function DateTimeField({
@@ -29,6 +31,7 @@ export function DateTimeField({
   hint,
   disabled = false,
   testID,
+  emptyText,
 }: DateTimeFieldProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -73,7 +76,7 @@ export function DateTimeField({
           {disabled
             ? t('listing.unknown')
             : value === null
-              ? t('listing.pickTime')
+              ? (emptyText ?? t('listing.pickTime'))
               : formatDateTime(value, language)}
         </AppText>
       </Pressable>

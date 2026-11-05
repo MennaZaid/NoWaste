@@ -64,3 +64,17 @@ What "Arabic RTL OK" means:
   screen, the back arrow on the Register screen points right and sits on the right, the Show/Hide control is on the
   left end of the password field, and the error mark is on the right of each error message.
 - Switching the language does not move the user to another screen and does not clear what was typed.
+
+### Turn 5 screens (US-18, US-19), added 2026-10-31
+
+Not Tested yet. Record each result in docs/test-execution.md with the date, tester and phone, then fill in the cell.
+
+| Screen                                                                                                                        | English OK | Arabic RTL OK | No clipped text |
+| ----------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------- | --------------- |
+| Draft listing: "Pickup urgency" with the estimate, the category choice and Confirm category                                   | Not Tested | Not Tested    | Not Tested      |
+| Draft listing: "Where should the food go?" with the unfit mark and the destinations (Recommended, landfill not available yet) | Not Tested | Not Tested    | Not Tested      |
+| Draft listing: Publish disabled with the "Confirm the category and choose a destination" note                                 | Not Tested | Not Tested    | Not Tested      |
+| Published listing: perishability category, pickup urgency and listing type rows                                               | Not Tested | Not Tested    | Not Tested      |
+| My listings: card with category and "Collect within ..."                                                                      | Not Tested | Not Tested    | Not Tested      |
+
+For the Turn 5 rows, "Arabic RTL OK" also means: the radio and check marks sit on the right, "Recommended" and the partner line read right-to-left, and no text says the food is safe (NFR-05a).

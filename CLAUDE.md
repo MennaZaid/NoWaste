@@ -2,7 +2,7 @@
 
 ## Sources of truth
 
-- docs/SRS.pdf, docs/SDD.pdf and docs/feedback-changes.md. Never invent requirements, screens, rules or values.
+- "docs/NoWaste Software Requirements Specification(SRS) (1).docx", "docs/NoWaste Software Design Document (SDD) (1).docx" and docs/feedback-changes.md. Never invent requirements, screens, rules or values.
 - If something is not specified, stop and ask, and add it to "Open questions" in PROGRESS.md.
 
 ## Start of every session

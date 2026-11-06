@@ -4,7 +4,7 @@ Each test comes only from the story's FR, E- and NFR rows in the SRS (and, where
 
 The SRS does not say which story each E- row belongs to; they are placed with the story whose requirement they guard (open question 22). Values that come from decisions still waiting for team approval (D-11, D-12, D-15) are marked.
 
-NFR-06 (every screen correct in Arabic RTL and English LTR, no clipped or overlapping text) applies to every screen below. It is checked once per screen with docs/nfr-06-checklist.md and listed in each story's last test. D-76 (2026-11-05): the accessibility scanner (NFR-07b contrast) is not part of these tests. D-77 (2026-11-05): the course runs the API over HTTP in development and is not deployed, so HTTPS (NFR-09a, IF-COM-01) is not tested.
+NFR-06 (every screen correct in Arabic RTL and English LTR, no clipped or overlapping text) applies to every screen below. It is checked once per screen with docs/nfr-06-checklist.md and listed in each story's last test. D-76 (2026-11-05): the accessibility scanner (NFR-07b contrast) is not part of these tests. D-77 (2026-11-05): the API runs over HTTP in development, so AT-US04-08 (HTTPS) stays Not Tested until HTTPS is set up.
 
 ## US-01 Consumer registration
 
@@ -47,17 +47,17 @@ Source for the location: docs/feedback-changes.md (map pin stored as PostGIS GEO
 
 ## US-04 Log in/out
 
-| ID         | Type   | Given                                                            | When                                                         | Then                                                                                      | SRS IDs              |
-| ---------- | ------ | ---------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------- |
-| AT-US04-01 | Normal | A registered consumer is on the login screen                     | They enter their email or mobile number and password         | They are logged in and the consumer home screen opens                                     | FR-ACC-04, IF-UI-01  |
-| AT-US04-02 | Normal | An approved vendor (or partner) is on the login screen           | They log in                                                  | The home screen for their role opens and the functions of their role are enabled          | FR-ACC-04, IF-UI-01  |
-| AT-US04-03 | Normal | A user is logged in                                              | They select Log out                                          | The session ends, the login screen is shown, and a request with the old token is refused  | FR-ACC-04, IF-COM-03 |
-| AT-US04-04 | Error  | A registered user is on the login screen                         | They enter a wrong password, and separately an unknown email | Both are rejected with the same message, which does not say which credential was wrong    | E-ACC-03             |
-| AT-US04-05 | Error  | A registered user has failed to log in 5 times within 15 minutes | They enter the correct password within 15 minutes            | The login is refused                                                                      | NFR-09d, E-ACC-03    |
-| AT-US04-06 | Error  | A vendor or partner whose application is Rejected                | They log in                                                  | The application status is shown and posting or receiving food is not allowed              | E-ACC-05             |
-| AT-US04-07 | Error  | A user is logged in with one role's access token                 | They call an endpoint of another role                        | The request receives HTTP 403 (every pair: consumer, vendor, partner, administrator)      | NFR-09c              |
-| AT-US04-08 | Error  | The API is reached                                               | A plain HTTP request is sent                                 | Removed by D-77: the API runs over HTTP in development and is not deployed in this course | NFR-09a, IF-COM-01   |
-| AT-US04-09 | Normal | The login screen is open                                         | It is checked in Arabic and English                          | Arabic is right-to-left, English left-to-right, no clipped or overlapping text            | NFR-06               |
+| ID         | Type   | Given                                                            | When                                                         | Then                                                                                     | SRS IDs              |
+| ---------- | ------ | ---------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------- |
+| AT-US04-01 | Normal | A registered consumer is on the login screen                     | They enter their email or mobile number and password         | They are logged in and the consumer home screen opens                                    | FR-ACC-04, IF-UI-01  |
+| AT-US04-02 | Normal | An approved vendor (or partner) is on the login screen           | They log in                                                  | The home screen for their role opens and the functions of their role are enabled         | FR-ACC-04, IF-UI-01  |
+| AT-US04-03 | Normal | A user is logged in                                              | They select Log out                                          | The session ends, the login screen is shown, and a request with the old token is refused | FR-ACC-04, IF-COM-03 |
+| AT-US04-04 | Error  | A registered user is on the login screen                         | They enter a wrong password, and separately an unknown email | Both are rejected with the same message, which does not say which credential was wrong   | E-ACC-03             |
+| AT-US04-05 | Error  | A registered user has failed to log in 5 times within 15 minutes | They enter the correct password within 15 minutes            | The login is refused                                                                     | NFR-09d, E-ACC-03    |
+| AT-US04-06 | Error  | A vendor or partner whose application is Rejected                | They log in                                                  | The application status is shown and posting or receiving food is not allowed             | E-ACC-05             |
+| AT-US04-07 | Error  | A user is logged in with one role's access token                 | They call an endpoint of another role                        | The request receives HTTP 403 (every pair: consumer, vendor, partner, administrator)     | NFR-09c              |
+| AT-US04-08 | Error  | The API is reached                                               | A plain HTTP request is sent                                 | The request is refused                                                                   | NFR-09a, IF-COM-01   |
+| AT-US04-09 | Normal | The login screen is open                                         | It is checked in Arabic and English                          | Arabic is right-to-left, English left-to-right, no clipped or overlapping text           | NFR-06               |
 
 ## US-07 Approve/reject
 

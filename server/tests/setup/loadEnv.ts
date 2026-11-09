@@ -12,3 +12,6 @@ if (existsSync(envFile)) {
     }
   }
 }
+
+// US-12 (D-80): tests never depend on the developer's AI_VISION_MODE; a test that needs a draft uses setVision.
+process.env.AI_VISION_MODE = 'off';

@@ -393,10 +393,30 @@ function notApproved(result: { status: number; data: Record<string, unknown> | n
  * POST /listings/photo with the compressed photo (NFR-08a). E-LST-02: any failure, including no connection, is
  * "failed", so the form can keep its values and offer Retry.
  */
+/** US-12 FR-LST-03: the AI draft for a photo. Every value is a Draft or an Estimate for the vendor to confirm. */
+export interface AiDraft {
+  foodType: string;
+  foodCategory: ListingFoodCategory;
+  /** D-82: shown only as an Estimate; it does not fill the number of bags. */
+  quantity: number | null;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  confidence: number;
+}
+
+/** The listing fields an AI draft can fill (D-81). */
+export type AiField = 'name' | 'description' | 'secondName' | 'secondDescription' | 'foodCategory';
+
 export async function uploadListingPhoto(
   token: string,
   uri: string,
-): Promise<ListingAnswer<{ kind: 'ok'; photoKey: string } | { kind: 'failed' }>> {
+): Promise<
+  ListingAnswer<
+    { kind: 'ok'; photoKey: string; draft?: AiDraft | null; draftError?: 'E-LST-01' } | { kind: 'failed' }
+  >
+> {
   // The file's own bytes are sent (D-50). A Blob from fetch("file://...") could reach the server empty on Android.
   let body: ArrayBuffer;
   try {
@@ -413,9 +433,13 @@ export async function uploadListingPhoto(
   if (result.kind !== 'response') return result;
   if (notApproved(result)) return { kind: 'notApproved' };
   const photoKey = result.data?.photoKey;
-  return result.status === 201 && typeof photoKey === 'string'
-    ? { kind: 'ok', photoKey }
-    : { kind: 'failed' };
+  if (result.status !== 201 || typeof photoKey !== 'string') return { kind: 'failed' };
+  // US-12: E-LST-01 when the AI gave no draft; the vendor fills the form by hand.
+  const draft = result.data?.draft;
+  if (draft === undefined) return { kind: 'ok', photoKey };
+  return typeof draft === 'object' && draft !== null
+    ? { kind: 'ok', photoKey, draft: draft as unknown as AiDraft }
+    : { kind: 'ok', photoKey, draft: null, draftError: 'E-LST-01' };
 }
 
 /** D-63, D-64: the name and description in one language; the pick-by time is worked out by the server. */
@@ -433,6 +457,10 @@ export type ListingRequest = {
   /** D-69: the vendor's end time, or undefined to use the worked-out limit. */
   pickupEnd: string | undefined;
   branchId: string | undefined;
+  /** US-12 (D-81): the other-language text from an AI draft, and the AI fields confirmed or edited (NFR-05b). */
+  secondName?: string;
+  secondDescription?: string;
+  confirmedAiFields?: AiField[];
 };
 
 export type QuickPostRequest = {
@@ -452,7 +480,13 @@ export type QuickPostRequest = {
 export type SaveListingResult = ListingAnswer<
   | { kind: 'ok'; listing: Listing }
   // E-LST-04; with the opening hours when the pickup is outside them (D-62).
-  | { kind: 'invalid'; fields: string[]; hours?: { opensAt: string; closesAt: string } }
+  | {
+      kind: 'invalid';
+      fields: string[];
+      hours?: { opensAt: string; closesAt: string };
+      /** NFR-05b: the fields are AI-filled and were not confirmed. */
+      unconfirmedAi?: boolean;
+    }
   // E-LST-03; with the latest allowed end when the pickup goes past the food limit (D-61).
   | { kind: 'afterExpiry'; latestPickupEnd?: string }
   | { kind: 'formalVendor' } // Quick Post is for informal vendors only
@@ -471,7 +505,8 @@ async function saveListing(path: string, body: object, token: string): Promise<S
       typeof data.opensAt === 'string' && typeof data.closesAt === 'string'
         ? { hours: { opensAt: data.opensAt, closesAt: data.closesAt } }
         : {};
-    return { kind: 'invalid', fields: data.fields as string[], ...hours };
+    const unconfirmed = data.unconfirmedAi === true ? { unconfirmedAi: true } : {};
+    return { kind: 'invalid', fields: data.fields as string[], ...hours, ...unconfirmed };
   }
   if (result.status === 400 && data?.error === 'E-LST-03') {
     return typeof data.latestPickupEnd === 'string'
@@ -514,6 +549,8 @@ export async function previewPickBy(
     storage: StorageCondition;
     pickupStart: string;
     branchId: string;
+    /** US-12: so an uncertain AI category gives the same window as saving (NFR-05d). */
+    photoKey?: string;
   },
 ): Promise<
   ListingAnswer<

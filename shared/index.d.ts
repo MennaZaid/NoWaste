@@ -187,7 +187,9 @@ export type ListingField =
   | 'price'
   | 'pickupStart'
   | 'pickupEnd'
-  | 'branchId';
+  | 'branchId'
+  | 'secondName'
+  | 'secondDescription';
 
 export interface ListingInput {
   photoKey?: unknown;
@@ -203,6 +205,9 @@ export interface ListingInput {
   /** D-69: optional; the vendor's end time, no later than the worked-out limit. */
   pickupEnd?: unknown;
   branchId?: unknown;
+  /** D-81 (US-12): the name and description in the other language, from an AI draft; optional. */
+  secondName?: unknown;
+  secondDescription?: unknown;
 }
 
 export interface ValidListing {
@@ -220,6 +225,9 @@ export interface ValidListing {
   /** D-69: the vendor's end time, or null to use the worked-out limit. */
   pickupEnd: string | null;
   branchId: string;
+  /** D-81: the text in the other language than `language`, or null. */
+  secondName: string | null;
+  secondDescription: string | null;
 }
 
 export type ListingValidation =

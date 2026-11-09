@@ -316,6 +316,13 @@ function isUuid(value) {
 }
 
 /** D-63: the listing text is written once, in Arabic or English; the server translates it into the other language. */
+/** D-81: optional text: missing or blank gives null, valid text gives it trimmed, anything else undefined (invalid). */
+function optionalText(value, max) {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
+    return null;
+  return isFilledText(value, max) ? value.trim() : undefined;
+}
+
 function checkListingText(input, fields) {
   if (!isFilledText(input.name, TEXT_LIMITS.name)) fields.push('name');
   if (!isFilledText(input.description, TEXT_LIMITS.description)) fields.push('description');
@@ -347,11 +354,18 @@ function validateListing(input) {
     fields.push('pickupEnd');
   }
   if (!isUuid(input.branchId)) fields.push('branchId');
+  // D-81 (US-12): the text in the other language, from an accepted or edited AI draft; optional.
+  const secondName = optionalText(input.secondName, TEXT_LIMITS.name);
+  if (secondName === undefined) fields.push('secondName');
+  const secondDescription = optionalText(input.secondDescription, TEXT_LIMITS.description);
+  if (secondDescription === undefined) fields.push('secondDescription');
 
   if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
   return {
     ok: true,
     value: {
+      secondName,
+      secondDescription,
       photoKey: input.photoKey.trim(),
       name: input.name.trim(),
       description: input.description.trim(),

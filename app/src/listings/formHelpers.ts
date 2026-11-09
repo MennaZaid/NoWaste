@@ -2,7 +2,7 @@
 import { PHOTO_MAX_BYTES } from '@nowaste/shared';
 import type { TFunction } from 'i18next';
 import type { Language } from '@nowaste/shared';
-import { uploadListingPhoto, type SaveListingResult } from '@/api/client';
+import { uploadListingPhoto, type AiDraft, type SaveListingResult } from '@/api/client';
 import { formatDateTime } from './formatDateTime';
 import { compressPhoto } from './compressPhoto';
 
@@ -17,7 +17,7 @@ export function parseAmount(text: string): number | undefined {
 }
 
 export type PhotoUpload =
-  | { kind: 'ok'; photoKey: string }
+  | { kind: 'ok'; photoKey: string; draft?: AiDraft | null; draftError?: 'E-LST-01' }
   | { kind: 'failed' } // E-LST-02: offer Retry, keep the form
   | { kind: 'tooLarge' } // NFR-08a: could not be compressed to the limit
   | { kind: 'notApproved' } // E-LST-06

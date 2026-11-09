@@ -30,7 +30,7 @@ Plan, prompts and checklists: docs/sprint-2-plan.md. Sprint 1 marked complete in
 | Eman   | Payment adapter, US-27, US-31   | 11     | sprint2/card-reservation         | Not started |
 | Farah  | OpenAPI, US-33                  | 3      | sprint2/pickup-code              | Not started |
 | Maryam | US-26, US-20, US-21             | 10     | sprint2/map-search-ranking       | Not started |
-| Menna  | AI adapter, US-12, US-32        | 10     | sprint2/ai-draft-listing         | US-12 built (2026-11-09), phone tests Not Tested; US-32 not started |
+| Menna  | AI adapter, US-12, US-32        | 10     | sprint2/ai-draft-listing         | US-12 merged (PR #8, 2026-11-09); US-32 waiting for the reservation base |
 
 ## Last turn (who, date, what was done, number of tests passing)
 
@@ -377,4 +377,4 @@ Maryam will send the SRS and SDD after the Milestone 1 code is finished; they wi
 - SRS FR-LST-02 / US-11 (D-75): Quick Post has an optional pickup start within the opening hours; the end is within the Highly perishable hours of the start.
 - SRS NFR-07b and the test plan (D-76): contrast is not checked with the accessibility scanner in this course; the acceptance tests check only the Arabic and English layout.
 - SRS US-18 acceptance tests (D-72, D-73): AT-US18-06 and AT-US18-07 removed; AT-US18-09 now says consumers see only the pickup time.
-- SRS FR-LST-03 / SDD 3.2.5.2 (D-81, D-84): the draft is asked for with a button after choosing the photo; both languages are stored; POST /listings takes `secondName`, `secondDescription`, `confirmedAiFields`; POST /listings/photo returns `draft` / `draftError`. SDD 4.2: table `ai_drafts`; settings row AI-CONFIDENCE.
+- (Done 2026-11-09, tracked changes by Menna in the SRS and SDD .docx) SRS FR-LST-03 / SDD 3.2.5.2 (D-81, D-84): the draft is asked for with a button after choosing the photo; both languages are stored; POST /listings takes `secondName`, `secondDescription`, `confirmedAiFields`; POST /listings/photo returns `draft` / `draftError`. SDD 4.2: table `ai_drafts`; settings row AI-CONFIDENCE.

@@ -30,7 +30,7 @@ Plan, prompts and checklists: docs/sprint-2-plan.md. Sprint 1 marked complete in
 | Eman   | Payment adapter, US-27, US-31   | 11     | sprint2/card-reservation         | Not started |
 | Farah  | OpenAPI, US-33                  | 3      | sprint2/pickup-code              | Not started |
 | Maryam | US-26, US-20, US-21             | 10     | sprint2/map-search-ranking       | Not started |
-| Menna  | AI adapter, US-12, US-32        | 10     | sprint2/ai-draft-listing         | US-12 built (2026-11-09), phone tests Not Tested; US-32 not started |
+| Menna  | AI adapter, US-12, US-32        | 10     | sprint2/ai-draft-listing         | US-12 merged (PR #8, 2026-11-09); US-32 waiting for the reservation base |
 
 ## Last turn (who, date, what was done, number of tests passing)
 

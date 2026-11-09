@@ -7,9 +7,6 @@ import { findShelfLifeHours } from '../../data/perishabilityRuleRepository.js';
 import { clock } from '../../domain/clock.js';
 import type { EstimateInput, EstimateRules, Thresholds } from '../../domain/perishability.js';
 
-/** Sprint 1: the food category is typed by the vendor, never by AI, so it is confident (D-54). */
-const AI_CONFIDENT_WITHOUT_AI = true;
-
 /** Reads BR-01; throws when the row is missing or not a pair of positive numbers. */
 export async function readThresholds(): Promise<Thresholds> {
   const value = (await getSetting('BR-01'))?.value as
@@ -28,6 +25,8 @@ export interface PerishabilityFacts {
   storage: StorageCondition | null;
   pickupStart: Date;
   isQuickPost: boolean;
+  /** NFR-05d (D-80): false when the category is an uncertain AI estimate; a vendor's own category is confident (D-54). */
+  aiConfident?: boolean;
 }
 
 /** Reads BR-01 and the shelf-life, and turns the facts into the input of the C-06 rules. Throws if BR-01 is bad. */
@@ -47,7 +46,7 @@ export async function rulesFor(
       storage,
       pickupStart: facts.pickupStart,
       isQuickPost: facts.isQuickPost,
-      aiConfident: AI_CONFIDENT_WITHOUT_AI,
+      aiConfident: facts.aiConfident ?? true,
     },
     rules: { now: clock.now(), thresholds, shelfLifeHours },
   };

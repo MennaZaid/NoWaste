@@ -467,5 +467,18 @@
       "unexpected": "Something went wrong. Please try again."
     },
     "pair": "{{first}}, {{second}}"
+  },
+  "aiDraft": {
+    "fill": "Fill in with AI draft",
+    "working": "Preparing an AI draft from your photo…",
+    "notice": "AI draft: check every field marked Draft, then confirm it or change it.",
+    "unavailable": "No AI draft this time. Please fill in the listing yourself.",
+    "draftTag": "Draft (AI)",
+    "confirm": "Confirm draft",
+    "confirmed": "Confirmed",
+    "confirmNeeded": "Confirm or change this AI draft before saving.",
+    "quantityEstimate": "Estimate: about {{count}} portions",
+    "secondNameLabel": "Name in Arabic",
+    "secondDescriptionLabel": "Description in Arabic"
   }
 }

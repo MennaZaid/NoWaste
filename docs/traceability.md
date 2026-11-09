@@ -41,7 +41,7 @@ Manual test results (with date, tester and device) are logged in docs/test-execu
 | BR-09          | US-33 (value only) | BR-09 settings row holds the SRS 5.5 value                                            | Integration | Value seeded; rule not built                              |
 | BR-10          | US-23 (value only) | BR-10 settings row holds the SRS 5.5 value; TBD-5 settings row exists with value null | Integration | Value open (TBD-5); rule not built                        |
 | BR-11          | US-43 (value only) | BR-11 settings row holds the SRS 5.5 value                                            | Integration | Value seeded; rule not built                              |
-| BR-12          | US-12 (value only) | BR-12 settings row holds the SRS 5.5 value                                            | Integration | Value seeded; rule not built                              |
+| BR-12          | US-12              | BR-12 settings row holds the SRS 5.5 value; E-LST-01 BR-12 the AI takes longer than the limit; NFR-02 BR-12 an answer inside the limit is used | Integration | Built (Sprint 2, D-83)                                     |
 
 ## Skeleton checks and decisions (not SRS requirements)
 
@@ -281,3 +281,19 @@ on full listings, NFR-05c with an expiry), the moved pickup pin (FR-LST-01) and 
 | FR-RTE-01, FR-RTE-02, E-RTE-01, NFR-05a, FR-RTE-04 (D-73) | US-18                      | AT-US18-01 to AT-US18-05, AT-US18-08 to AT-US18-10                                                                                                    | System (phone) | Passed (reported by Maryam)                                                              |
 | FR-RTE-05, FR-RTE-06, FR-RTE-07                           | US-19                      | AT-US19-01 to AT-US19-05                                                                                                                              | System (phone) | Passed (reported by Maryam); AT-US19-06 Not Tested on the phone (automated test passing) |
 | FR-ACC-02, FR-ACC-04, E-ACC-02, NFR-09b                   | US-01, US-02, US-03, US-04 | AT-US01-03, AT-US02-03, AT-US02-05, AT-US03-04, AT-US04-02                                                                                            | System (phone) | Passed (reported by Maryam)                                                              |
+
+## Sprint 2: US-12 AI draft listing (Menna, 2026-11-09)
+
+| Requirement | Story | Tests (server/tests/aiDraft.test.ts, app/__tests__/aiDraft.test.tsx) | Acceptance tests | Status |
+| ----------- | ----- | -------------------------------------------------------------------- | ---------------- | ------ |
+| FR-LST-03 | US-12 | Server: draft returned on upload; mock adapter; accept draft stores both languages; edited draft value stored. App: no AI call until asked (D-84); draft fills name, description, category; other language shown | AT-US12-01, AT-US12-02 | Built, phone Not Tested |
+| E-LST-01 | US-12 | Server: AI fails; slower than BR-12; malformed draft. App: no draft message, form stays manual | AT-US12-04 | Built, phone Not Tested |
+| NFR-02 | US-12 | Server: answer inside the BR-12 limit is used | AT-US12-05 (20 photos, 18 within 10 s) | Needs a real provider (TBD-2) |
+| NFR-03 | US-12 | Server: listing saved by hand with the AI unavailable. App: manual save sends no AI fields | AT-US12-04 | Built |
+| NFR-04 | US-12 | None: needs a real provider and the 60 labelled photos | AT-US12-06 | Not Tested (TBD-2) |
+| NFR-05a | US-12 | App: AI values labelled Draft / Estimate; no AI text says the food is safe | AT-US12-02 | Built |
+| NFR-05b | US-12 | Server: unconfirmed AI field refused with its name; no draft needs no confirming; bad confirmedAiFields refused. App: save stopped and fields marked; confirm or edit then save; server refusal marks again | AT-US12-03 | Built |
+| NFR-05d | US-12 | Server: confidence below AI-CONFIDENCE is Highly perishable; at the value is confident; value from settings; vendor-changed category confident; pick-by preview agrees | AT-US12-07 | Built |
+| E-LST-04 | US-12 | Server: second-language name over 80 characters refused | – | Built |
+| NFR-06 | US-12 | App: in Arabic the main fields get the Arabic draft and the second fields the English one | AT-US12-02 | Built, phone Not Tested |
+| FR-LST-03 (Groq, D-85) | US-12 | server/tests/groqVision.test.ts: sends photo, key and model, returns the draft; missing quantity null; error answer rejects; non-JSON rejects | AT-US12-05, AT-US12-06 | Built; one real call (test image, 0.9 s); food photos Not Tested |

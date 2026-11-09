@@ -15,7 +15,8 @@
     "seed:admin": "tsx --env-file-if-exists=.env src/seedAdmin.ts",
     "test": "jest --runInBand",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "try-vision": "tsx --env-file-if-exists=.env src/tryVision.ts"
   },
   "dependencies": {
     "@nowaste/shared": "^0.1.0",

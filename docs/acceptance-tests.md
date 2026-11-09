@@ -105,6 +105,18 @@ Source for the pickup location: docs/feedback-changes.md (each listing has its o
 | AT-US11-05 | Error  | An informal vendor whose account is not approved | They try to publish a Quick Post                                                      | The action is refused                                                          | E-LST-06                     |
 | AT-US11-06 | Normal | The Quick Post screen is open                    | It is checked in Arabic and English                                                   | Arabic is right-to-left, English left-to-right, no clipped or overlapping text | NFR-06                       |
 
+## US-12 AI draft listing (Sprint 2)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US12-01 | Normal | A formal vendor on Create listing has chosen a photo, AI on (mock) | They tap "Fill in with AI draft" | Name, description (both languages) and category are filled and marked Draft (AI); the quantity shows as an Estimate | FR-LST-03, NFR-05a, D-81, D-82 |
+| AT-US12-02 | Normal | The draft is shown, app in Arabic | They look at the form | The main fields hold the Arabic draft, the second fields the English one; layout is right-to-left; no text says the food is safe | FR-LST-03, NFR-05a, NFR-06 |
+| AT-US12-03 | Error | The draft is shown | They press Save without confirming; then confirm or edit each field and save | Save is stopped and each unconfirmed field says so; after confirming the listing is saved with both languages | NFR-05b |
+| AT-US12-04 | Error | AI off (`AI_VISION_MODE` empty) | They tap "Fill in with AI draft" | "No AI draft this time" is shown; they fill the form by hand and save | E-LST-01, NFR-03 |
+| AT-US12-05 | Performance | A real provider (TBD-2) | 20 test photos are drafted | At least 18 return a draft within 10 seconds | NFR-02, BR-12 |
+| AT-US12-06 | Accuracy | A real provider (TBD-2) | 60 labelled photos are classified | At least 80% get the correct category | NFR-04 |
+| AT-US12-07 | Normal | AI-CONFIDENCE 0.7; a draft with low confidence | The vendor keeps the AI category and saves | The listing is Highly perishable | NFR-05d, D-80 |
+
 ## US-13 Preparation/storage/expiry
 
 | ID         | Type   | Given                                              | When                                                                     | Then                                                                           | SRS IDs              |

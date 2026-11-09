@@ -1,5 +1,6 @@
 // C-05 Listing Service: create listings (US-10, FR-LST-01), Quick Posts (US-11, FR-LST-02), the photo upload (C-26,
-// NFR-08a) and publishing. Sprint 1 has no AI: the vendor writes the listing (E-LST-01 manual path, NFR-03).
+// NFR-08a) and publishing. US-12 (D-80 to D-83): the photo upload also asks the AI for a draft (aiDraft.ts); without
+// one the vendor writes the listing by hand (E-LST-01, NFR-03).
 // D-66 (2026-11-03, replaces the translation of D-63): the name and description are stored exactly as the vendor wrote
 // them, in the language they are written in; nothing is translated. D-64: a listing is picked up at one of the vendor's branches; preparation time and expiry are no longer
 // asked; the pick-by time is worked out from the rules (pickup start + shelf-life) and capped at the branch's closing
@@ -20,6 +21,14 @@ import { estimate, pickBy, type PerishabilityCategory } from '../../domain/peris
 import { getSetting } from '../../data/settingsRepository.js';
 import { openingPeriodFor } from '../../domain/openingHours.js';
 import { rulesFor } from '../perishability/thresholds.js';
+import {
+  checkConfirmed,
+  draftForPhoto,
+  draftOf,
+  isAiConfident,
+  parseConfirmed,
+  type AiDraft,
+} from './aiDraft.js';
 import {
   findVendorBranch,
   findVendorBranches,
@@ -147,9 +156,16 @@ async function openingPeriod(
   return { ...period, hours };
 }
 
-/** D-66: the listing text as the vendor wrote it, stored under its language; the other language stays empty. */
-function asWritten(text: { name: string; description: string }, language: Language) {
-  const pick = (lang: Language, field: 'name' | 'description') => (lang === language ? text[field] : null);
+/**
+ * D-66: the listing text as the vendor wrote it, stored under its language. D-81: the other language holds the
+ * accepted or edited AI draft text when there is one, otherwise it stays empty.
+ */
+function asWritten(
+  text: { name: string; description: string; secondName?: string | null; secondDescription?: string | null },
+  language: Language,
+) {
+  const pick = (lang: Language, field: 'name' | 'description') =>
+    lang === language ? text[field] : ((field === 'name' ? text.secondName : text.secondDescription) ?? null);
   return {
     nameAr: pick('ar', 'name'),
     nameEn: pick('en', 'name'),
@@ -183,7 +199,7 @@ async function maxPhotoBytes(): Promise<number> {
 export async function uploadPhoto(
   data: Buffer,
   contentType: string | undefined,
-): Promise<{ photoKey: string }> {
+): Promise<{ photoKey: string; draft: AiDraft | null; draftError?: 'E-LST-01' }> {
   if (data.length > (await maxPhotoBytes())) {
     throw new SrsError(413, { error: 'E-LST-04', fields: ['photo'] });
   }
@@ -191,7 +207,9 @@ export async function uploadPhoto(
   if (contentType === 'image/jpeg' && startsWith(data, JPEG)) type = 'image/jpeg';
   else if (contentType === 'image/png' && startsWith(data, PNG)) type = 'image/png';
   else throw invalidPhoto();
-  return { photoKey: await getStorage().save(data, type) };
+  const photoKey = await getStorage().save(data, type);
+  // US-12 FR-LST-03: the AI draft, or E-LST-01 (the vendor fills the form by hand).
+  return { photoKey, ...(await draftForPhoto(photoKey, { data, type })) };
 }
 
 async function shopOf(vendorId: string): Promise<ShopDetails> {
@@ -268,7 +286,7 @@ async function formalOnly(vendorId: string): Promise<void> {
  */
 async function workOutPickBy(
   branch: BranchRecord,
-  facts: { foodCategory: string; storage: string; pickupStart: Date },
+  facts: { foodCategory: string; storage: string; pickupStart: Date; aiConfident: boolean },
 ): Promise<{ pickupEnd: Date; closesAt: Date; category: PerishabilityCategory }> {
   const period = await openingPeriod(branch, facts.pickupStart, 'pickupStart');
   const { input, rules } = await rulesFor({
@@ -276,6 +294,7 @@ async function workOutPickBy(
     storage: facts.storage === 'unknown' ? null : (facts.storage as never),
     pickupStart: facts.pickupStart,
     isQuickPost: false,
+    aiConfident: facts.aiConfident,
   });
   return {
     pickupEnd: pickBy(input, rules, period.closes),
@@ -291,7 +310,14 @@ async function workOutPickBy(
  */
 export async function previewPickBy(
   vendorId: string,
-  input: { foodCategory?: unknown; storage?: unknown; pickupStart?: unknown; branchId?: unknown },
+  input: {
+    foodCategory?: unknown;
+    storage?: unknown;
+    pickupStart?: unknown;
+    branchId?: unknown;
+    /** US-12: the uploaded photo, so an uncertain AI category gives the same answer as saving (NFR-05d). */
+    photoKey?: unknown;
+  },
 ): Promise<{
   pickupEnd: string;
   closesAt: string;
@@ -306,7 +332,10 @@ export async function previewPickBy(
     bagsTotal: 1,
     originalValue: 1,
     price: 1,
-    ...input,
+    foodCategory: input.foodCategory,
+    storage: input.storage,
+    pickupStart: input.pickupStart,
+    branchId: input.branchId,
   });
   if (!check.ok) {
     const fields = check.fields.filter((f) =>
@@ -315,10 +344,12 @@ export async function previewPickBy(
     throw new SrsError(400, { error: 'E-LST-04', fields });
   }
   const branch = await ownBranch(vendorId, check.value.branchId);
+  const draft = typeof input.photoKey === 'string' ? await draftOf(input.photoKey) : undefined;
   const { pickupEnd, closesAt, category } = await workOutPickBy(branch, {
     foodCategory: check.value.foodCategory,
     storage: check.value.storage,
     pickupStart: new Date(check.value.pickupStart),
+    aiConfident: await isAiConfident(draft, check.value.foodCategory),
   });
   return {
     pickupEnd: pickupEnd.toISOString(),
@@ -333,18 +364,26 @@ export async function previewPickBy(
  * POST /listings: a full listing, saved as a Draft (FR-LST-01, FR-LST-04 as changed by D-64, E-LST-04). Formal
  * vendors only. The pickup location is the chosen branch and the pick-by time is worked out by the server.
  */
-export async function createListing(vendorId: string, input: ListingInput): Promise<ListingView> {
+export async function createListing(
+  vendorId: string,
+  input: ListingInput & { confirmedAiFields?: unknown },
+): Promise<ListingView> {
   const check = validateListing(input);
   if (!check.ok) throw new SrsError(400, { error: 'E-LST-04', fields: check.fields });
   const listing = check.value;
+  const confirmed = parseConfirmed(input.confirmedAiFields);
   await formalOnly(vendorId);
   await checkPhotoKey(listing.photoKey);
+  // US-12: NFR-05b every AI-filled field confirmed; NFR-05d an uncertain AI category is Highly perishable.
+  const draft = await draftOf(listing.photoKey);
+  checkConfirmed(draft, listing, confirmed);
   const branch = await ownBranch(vendorId, listing.branchId);
   const pickupStart = new Date(listing.pickupStart);
   const { pickupEnd: limit, category } = await workOutPickBy(branch, {
     foodCategory: listing.foodCategory,
     storage: listing.storage,
     pickupStart,
+    aiConfident: await isAiConfident(draft, listing.foodCategory),
   });
   // D-69: the vendor may end the pickup earlier than the worked-out limit, never later (E-LST-03).
   const chosen = listing.pickupEnd === null ? null : new Date(listing.pickupEnd);

@@ -31,7 +31,7 @@ function bodyOf(body: unknown): Record<string, unknown> {
 // answered 413 by the service instead of being read in full.
 const readPhoto = express.raw({ type: () => true, limit: PHOTO_MAX_BYTES + 1024 });
 
-/** POST /listings/photo: the body is the JPEG or PNG file itself. Returns 201 {photoKey}. */
+/** POST /listings/photo: the body is the JPEG or PNG file itself. Returns 201 {photoKey, draft, draftError?} (US-12). */
 export const uploadPhotoHandler: RequestHandler = (req, res, next) => {
   readPhoto(req, res, (error?: unknown) => {
     if (error !== undefined) {
@@ -62,14 +62,20 @@ export const createListingHandler: RequestHandler = async (req, res) => {
     pickupStart: b.pickupStart,
     pickupEnd: b.pickupEnd,
     branchId: b.branchId,
+    // US-12 (D-81): the other-language text from an AI draft and the AI fields the vendor confirmed or edited.
+    secondName: b.secondName,
+    secondDescription: b.secondDescription,
+    confirmedAiFields: b.confirmedAiFields,
   });
   res.status(201).json(listing);
 };
 
 /** POST /listings/pick-by: the pick-by time a listing would get (D-64), shown in the form before saving. */
 export const previewPickByHandler: RequestHandler = async (req, res) => {
-  const { foodCategory, storage, pickupStart, branchId } = bodyOf(req.body);
-  res.json(await previewPickBy(authOf(res).user.id, { foodCategory, storage, pickupStart, branchId }));
+  const { foodCategory, storage, pickupStart, branchId, photoKey } = bodyOf(req.body);
+  res.json(
+    await previewPickBy(authOf(res).user.id, { foodCategory, storage, pickupStart, branchId, photoKey }),
+  );
 };
 
 /**

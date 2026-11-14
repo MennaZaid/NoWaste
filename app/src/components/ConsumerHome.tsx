@@ -5,26 +5,69 @@
 // the branch address and a close (×) button back to all offers. Tapping an offer opens its product page.
 // IF-HW-03 / IF-HW-04: the app asks for the location; if it is refused, it says that nearby search needs it and shows
 // offers around central Cairo (D-65, part of TBD-3), with a button to ask again.
+// D-87 (US-26 filters): a maximum price and an "I can pick up by" time, checked with the shared rules the server also
+// applies; they work together, stay when the distance changes and can be cleared. The vendor rating filter waits for
+// ratings (a later story). D-88: the distance and the two filters are chips over the map; each chip opens a pop-up sheet
+// with its control, price and time are applied with Apply, and the list starts at about a third of the screen.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { validateOfferFilters, type OfferFilters } from '@nowaste/shared';
 import { getNearbyOffers, type Offer, type SearchRadius } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { useLanguage } from '@/i18n/LanguageProvider';
+import { formatDateTime } from '@/listings/formatDateTime';
+import { parseAmount } from '@/listings/formHelpers';
 import { listingText } from '@/listings/listingText';
 import { FALLBACK_CENTER, readDevicePosition } from '@/location/devicePosition';
 import { colors, radius, spacing } from '@/theme';
 import { AppText } from './AppText';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
+import { DateTimeField } from './DateTimeField';
 import { DistanceSlider } from './DistanceSlider';
+import { FilterSheet } from './FilterSheet';
 import { ListingPhoto } from './ListingPhoto';
 import { OffersMap, type Coordinates, type MapPlace } from './MapView';
 import { Notice } from './Notice';
+import { TextField } from './TextField';
 
 type Located = 'asking' | 'found' | 'denied';
 type Problem = 'unreachable' | 'unexpected';
+
+const NO_FILTERS: OfferFilters = { maxPrice: null, pickupBy: null };
+
+type Sheet = 'distance' | 'price' | 'pickup';
+
+/** D-88: one chip over the map; filled when its filter is set. */
+function Chip({
+  testID,
+  text,
+  accessibilityLabel,
+  active,
+  onPress,
+}: {
+  testID: string;
+  text: string;
+  accessibilityLabel: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.chipPressed]}
+    >
+      <AppText variant="label" color={active ? 'onPrimary' : 'text'} numberOfLines={1}>
+        {text} ▾
+      </AppText>
+    </Pressable>
+  );
+}
 
 /** One row of the panel: photo, name and price (D-65). */
 function OfferRow({ token, offer, onPress }: { token: string; offer: Offer; onPress: () => void }) {
@@ -61,7 +104,7 @@ function OfferRow({ token, offer, onPress }: { token: string; offer: Offer; onPr
 export function ConsumerHome() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { direction } = useLanguage();
+  const { direction, language } = useLanguage();
   const { token, signOut } = useAuth();
 
   const [located, setLocated] = useState<Located>('asking');
@@ -77,6 +120,15 @@ export function ConsumerHome() {
   const [areaHeight, setAreaHeight] = useState(0);
   // Only the newest request is applied when the slider moves quickly.
   const request = useRef(0);
+  // D-87: the filters in use (also read by every load, so they stay when the distance or position changes).
+  const [filters, setFilters] = useState<OfferFilters>(NO_FILTERS);
+  const filtersRef = useRef<OfferFilters>(NO_FILTERS);
+  // D-88: the open pop-up sheet, and what is typed or chosen there before Apply.
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [priceText, setPriceText] = useState('');
+  const [pickupDraft, setPickupDraft] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState(false);
+  const [pickupError, setPickupError] = useState(false);
 
   const placeAt = useCallback((here: Coordinates | null) => {
     setCenter(here ?? FALLBACK_CENTER);
@@ -98,7 +150,13 @@ export function ConsumerHome() {
       const mine = ++request.current;
       setLoading(true);
       setProblem(null);
-      const result = await getNearbyOffers(token, { ...at, radiusKm });
+      const { maxPrice, pickupBy } = filtersRef.current;
+      const result = await getNearbyOffers(token, {
+        ...at,
+        radiusKm,
+        ...(maxPrice === null ? {} : { maxPrice }),
+        ...(pickupBy === null ? {} : { pickupBy }),
+      });
       if (mine !== request.current) return;
       setLoading(false);
       if (result.kind === 'ok') {
@@ -156,7 +214,77 @@ export function ConsumerHome() {
   if (token === null) return null;
   const session = token;
 
-  const collapsed = Math.max(areaHeight * 0.45, 160);
+  /** D-87: uses the new filters and loads the offers again at the distance chosen so far. */
+  function applyFilters(next: OfferFilters) {
+    filtersRef.current = next;
+    setFilters(next);
+    if (center !== null) void load(center, km ?? undefined);
+  }
+
+  /** D-88: opens a chip's sheet with the value in use; nothing changes until Apply. */
+  function openSheet(next: Sheet) {
+    setPriceText(filters.maxPrice === null ? '' : String(filters.maxPrice));
+    setPickupDraft(filters.pickupBy);
+    setPriceError(false);
+    setPickupError(false);
+    setSheet(next);
+  }
+
+  /** The maximum price typed in the sheet; empty means no price filter. */
+  function applyPrice() {
+    const text = priceText.trim();
+    const maxPrice = text === '' ? undefined : (parseAmount(text) ?? Number.NaN);
+    const check = validateOfferFilters({ maxPrice }, new Date());
+    setPriceError(!check.ok);
+    if (!check.ok) return;
+    setSheet(null);
+    if (check.value.maxPrice !== filtersRef.current.maxPrice) {
+      applyFilters({ ...filtersRef.current, maxPrice: check.value.maxPrice });
+    }
+  }
+
+  /** "I can pick up by": checked on Apply, so choosing the day and then the time is never marked early. */
+  function applyPickupBy() {
+    const check = validateOfferFilters({ pickupBy: pickupDraft ?? undefined }, new Date());
+    setPickupError(!check.ok);
+    if (!check.ok) return;
+    setSheet(null);
+    if (check.value.pickupBy !== filtersRef.current.pickupBy) {
+      applyFilters({ ...filtersRef.current, pickupBy: check.value.pickupBy });
+    }
+  }
+
+  /** Clear in one sheet: removes only that filter. */
+  function clearOne(which: 'price' | 'pickup') {
+    setSheet(null);
+    setPriceError(false);
+    setPickupError(false);
+    if (which === 'price') setPriceText('');
+    else setPickupDraft(null);
+    const next = which === 'price' ? { ...filters, maxPrice: null } : { ...filters, pickupBy: null };
+    if (next.maxPrice !== filters.maxPrice || next.pickupBy !== filters.pickupBy) applyFilters(next);
+  }
+
+  function clearFilters() {
+    setPriceText('');
+    setPickupDraft(null);
+    setPriceError(false);
+    setPickupError(false);
+    applyFilters(NO_FILTERS);
+  }
+
+  const activeFilters = (filters.maxPrice === null ? 0 : 1) + (filters.pickupBy === null ? 0 : 1);
+  const priceValue =
+    filters.maxPrice === null
+      ? t('offers.filters.anyPrice')
+      : t('offers.filters.upTo', { price: t('listing.egp', { amount: filters.maxPrice }) });
+  const pickupValue =
+    filters.pickupBy === null
+      ? t('offers.filters.anyTime')
+      : t('offers.filters.by', { time: formatDateTime(filters.pickupBy, language) });
+
+  // D-88: the list starts at about a third of the screen, so the pins stay visible; it can be pulled up.
+  const collapsed = Math.max(areaHeight * 0.33, 160);
   const full = Math.max(areaHeight * 0.92, collapsed);
 
   return (
@@ -186,25 +314,142 @@ export function ConsumerHome() {
             <Button variant="secondary" label={t('offers.tryLocationAgain')} onPress={locate} />
           </Notice>
         ) : null}
-        {radiusSettings !== null ? (
-          <View style={styles.sliderCard}>
-            <DistanceSlider
-              testID="offers-distance"
-              label={t('offers.distanceLabel')}
-              value={distance}
-              min={radiusSettings.minKm}
-              max={radiusSettings.maxKm}
-              step={radiusSettings.stepKm}
-              format={formatKm}
-              onChange={setKm}
-              onChangeEnd={(value) => {
-                setKm(value);
-                if (center !== null) void load(center, value);
+        {/* D-88: one slim row of chips, so the map stays visible. */}
+        <View style={styles.chips}>
+          {radiusSettings !== null ? (
+            <Chip
+              testID="offers-chip-distance"
+              text={formatKm(distance)}
+              accessibilityLabel={t('offers.pair', { first: t('offers.distanceLabel'), second: formatKm(distance) })}
+              active={false}
+              onPress={() => {
+                openSheet('distance');
+              }}
+            />
+          ) : null}
+          <Chip
+            testID="offers-chip-price"
+            text={filters.maxPrice === null ? t('offers.filters.priceChip') : priceValue}
+            accessibilityLabel={t('offers.pair', { first: t('offers.filters.maxPriceLabel'), second: priceValue })}
+            active={filters.maxPrice !== null}
+            onPress={() => {
+              openSheet('price');
+            }}
+          />
+          <Chip
+            testID="offers-chip-pickup"
+            text={filters.pickupBy === null ? t('offers.filters.pickupChip') : pickupValue}
+            accessibilityLabel={t('offers.pair', { first: t('offers.filters.pickupByLabel'), second: pickupValue })}
+            active={filters.pickupBy !== null}
+            onPress={() => {
+              openSheet('pickup');
+            }}
+          />
+        </View>
+      </View>
+
+      {radiusSettings !== null ? (
+        <FilterSheet
+          visible={sheet === 'distance'}
+          title={t('offers.distanceLabel')}
+          closeLabel={t('offers.filters.done')}
+          onClose={() => {
+            setSheet(null);
+          }}
+        >
+          <DistanceSlider
+            testID="offers-distance"
+            label={t('offers.distanceLabel')}
+            value={distance}
+            min={radiusSettings.minKm}
+            max={radiusSettings.maxKm}
+            step={radiusSettings.stepKm}
+            format={formatKm}
+            onChange={setKm}
+            onChangeEnd={(value) => {
+              setKm(value);
+              if (center !== null) void load(center, value);
+            }}
+          />
+          <Button
+            label={t('offers.filters.done')}
+            onPress={() => {
+              setSheet(null);
+            }}
+          />
+        </FilterSheet>
+      ) : null}
+
+      <FilterSheet
+        visible={sheet === 'price'}
+        title={t('offers.filters.maxPriceLabel')}
+        closeLabel={t('offers.filters.done')}
+        onClose={() => {
+          setSheet(null);
+        }}
+      >
+        <TextField
+          testID="offers-max-price"
+          label={t('offers.filters.maxPriceLabel')}
+          value={priceText}
+          onChangeText={(text) => {
+            setPriceText(text);
+            setPriceError(false);
+          }}
+          error={priceError ? t('offers.filters.priceError') : undefined}
+          keyboardType="decimal-pad"
+        />
+        <View style={styles.sheetButtons}>
+          <View style={styles.sheetButton}>
+            <Button
+              variant="secondary"
+              label={t('offers.filters.clearOne')}
+              onPress={() => {
+                clearOne('price');
               }}
             />
           </View>
-        ) : null}
-      </View>
+          <View style={styles.sheetButton}>
+            <Button label={t('offers.filters.apply')} onPress={applyPrice} />
+          </View>
+        </View>
+      </FilterSheet>
+
+      <FilterSheet
+        visible={sheet === 'pickup'}
+        title={t('offers.filters.pickupByLabel')}
+        closeLabel={t('offers.filters.done')}
+        onClose={() => {
+          setSheet(null);
+        }}
+      >
+        <DateTimeField
+          testID="offers-pickup-by"
+          label={t('offers.filters.pickupByLabel')}
+          hint={t('offers.filters.pickupByHint')}
+          emptyText={t('offers.filters.anyTime')}
+          value={pickupDraft}
+          onChange={(iso) => {
+            setPickupDraft(iso);
+            setPickupError(false);
+          }}
+          error={pickupError ? t('offers.filters.pickupByError') : undefined}
+        />
+        <View style={styles.sheetButtons}>
+          <View style={styles.sheetButton}>
+            <Button
+              variant="secondary"
+              label={t('offers.filters.clearOne')}
+              onPress={() => {
+                clearOne('pickup');
+              }}
+            />
+          </View>
+          <View style={styles.sheetButton}>
+            <Button label={t('offers.filters.apply')} onPress={applyPickupBy} />
+          </View>
+        </View>
+      </FilterSheet>
 
       <BottomSheet
         testID="offers-sheet"
@@ -272,11 +517,19 @@ export function ConsumerHome() {
               />
             )}
             ListEmptyComponent={
-              problem === null ? (
+              problem !== null ? undefined : activeFilters > 0 ? (
+                // D-87: with filters, say so and offer to clear them.
+                <View style={styles.emptyFiltered}>
+                  <AppText testID="offers-empty" color="textMuted">
+                    {t('offers.filters.empty', { km: distance })}
+                  </AppText>
+                  <Button variant="secondary" label={t('offers.filters.clear')} onPress={clearFilters} />
+                </View>
+              ) : (
                 <AppText testID="offers-empty" color="textMuted">
                   {t('offers.empty', { km: distance })}
                 </AppText>
-              ) : undefined
+              )
             }
           />
         )}
@@ -293,13 +546,6 @@ const styles = StyleSheet.create({
   top: {
     padding: spacing.md,
     gap: spacing.sm,
-  },
-  sliderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -345,5 +591,36 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: spacing.xs,
+  },
+  emptyFiltered: {
+    gap: spacing.sm,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  chipPressed: {
+    opacity: 0.8,
+  },
+  sheetButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  sheetButton: {
+    flex: 1,
   },
 });

@@ -31,7 +31,10 @@ function bodyOf(body: unknown): Record<string, unknown> {
 // answered 413 by the service instead of being read in full.
 const readPhoto = express.raw({ type: () => true, limit: PHOTO_MAX_BYTES + 1024 });
 
-/** POST /listings/photo: the body is the JPEG or PNG file itself. Returns 201 {photoKey, draft, draftError?} (US-12). */
+/**
+ * POST /listings/photo: the body is the JPEG or PNG file itself. Returns 201 {photoKey}. With ?draft=1 (the vendor
+ * tapped "Fill in with AI draft", D-84, D-86) it also returns {draft, draftError?} (US-12).
+ */
 export const uploadPhotoHandler: RequestHandler = (req, res, next) => {
   readPhoto(req, res, (error?: unknown) => {
     if (error !== undefined) {
@@ -40,7 +43,7 @@ export const uploadPhotoHandler: RequestHandler = (req, res, next) => {
       return;
     }
     const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    uploadPhoto(data, req.get('content-type')?.split(';')[0]?.trim())
+    uploadPhoto(data, req.get('content-type')?.split(';')[0]?.trim(), req.query.draft === '1')
       .then((result) => res.status(201).json(result))
       .catch(next);
   });
@@ -80,11 +83,23 @@ export const previewPickByHandler: RequestHandler = async (req, res) => {
 
 /**
  * POST /listings/quick: photo, name, description, optional food category (D-68), bags, price, optional pickup start
- * (D-75) and pickup end time.
+ * (D-75) and pickup end time. D-86: optionally the other-language text from an AI draft and the confirmed AI fields.
  */
 export const createQuickPostHandler: RequestHandler = async (req, res) => {
-  const { photoKey, name, description, language, foodCategory, bagsTotal, price, pickupStart, pickupEnd } =
-    bodyOf(req.body);
+  const {
+    photoKey,
+    name,
+    description,
+    language,
+    foodCategory,
+    bagsTotal,
+    price,
+    pickupStart,
+    pickupEnd,
+    secondName,
+    secondDescription,
+    confirmedAiFields,
+  } = bodyOf(req.body);
   res.status(201).json(
     await createQuickPost(authOf(res).user.id, {
       photoKey,
@@ -98,6 +113,10 @@ export const createQuickPostHandler: RequestHandler = async (req, res) => {
       // D-75: optional; without it the pickup starts now.
       pickupStart,
       pickupEnd,
+      // D-86 (US-12 for Quick Post): optional, like the full listing (D-81).
+      secondName,
+      secondDescription,
+      confirmedAiFields,
     }),
   );
 };

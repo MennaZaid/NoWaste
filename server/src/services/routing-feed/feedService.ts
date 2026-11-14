@@ -1,6 +1,7 @@
 // C-07 Routing & Feed Service, IFeed (SDD 3.2.1): the consumer's nearby offers for the map and the list (FR-RES-01,
 // US-26) in the FR-RTE-08 / FR-RTE-09 order, decision D-65. The distance limits come from the settings row FR-RES-01
 // (never constants in code). The pickup urgency is the pick-by time (D-61); nothing here says the food is safe.
+import { validateOfferFilters } from '@nowaste/shared';
 import { getStorage, type PhotoType } from '../../adapters/storage/storage.js';
 import { clock } from '../../domain/clock.js';
 import { SrsError } from '../../domain/errors.js';
@@ -105,11 +106,15 @@ function numberParam(value: unknown): number | undefined {
 /**
  * GET /listings/nearby?latitude&longitude&radiusKm (FR-RES-01). Without radiusKm the FR-RES-01 default is used.
  * 400 `{"error":"invalid_search","fields":[...]}` for a missing or out-of-range location or distance.
+ * D-87: the optional filters `maxPrice` (offers at or below it) and `pickupBy` (offers whose pickup starts by then),
+ * checked with the shared rules the app also uses; they keep the FR-RTE-08 / FR-RTE-09 order.
  */
 export async function nearbyOffers(query: {
   latitude?: unknown;
   longitude?: unknown;
   radiusKm?: unknown;
+  maxPrice?: unknown;
+  pickupBy?: unknown;
 }): Promise<{ radius: RadiusSettings & { km: number }; offers: OfferView[] }> {
   const settings = await readRadiusSettings();
   const latitude = numberParam(query.latitude);
@@ -119,10 +124,16 @@ export async function nearbyOffers(query: {
   if (latitude === undefined || !(latitude >= -90 && latitude <= 90)) fields.push('latitude');
   if (longitude === undefined || !(longitude >= -180 && longitude <= 180)) fields.push('longitude');
   if (!(radiusKm >= settings.minKm && radiusKm <= settings.maxKm)) fields.push('radiusKm');
-  if (fields.length > 0 || latitude === undefined || longitude === undefined) {
+  const now = clock.now();
+  const filters = validateOfferFilters(
+    { maxPrice: numberParam(query.maxPrice), pickupBy: query.pickupBy === '' ? undefined : query.pickupBy },
+    now,
+  );
+  if (!filters.ok) fields.push(...filters.fields);
+  if (!filters.ok || fields.length > 0 || latitude === undefined || longitude === undefined) {
     throw new SrsError(400, { error: 'invalid_search', fields });
   }
-  const offers = await findOffersNear({ latitude, longitude }, radiusKm * 1000, clock.now());
+  const offers = await findOffersNear({ latitude, longitude }, radiusKm * 1000, now, filters.value);
   return { radius: { ...settings, km: radiusKm }, offers: offers.map(toView) };
 }
 

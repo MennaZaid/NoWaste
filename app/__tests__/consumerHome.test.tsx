@@ -126,6 +126,8 @@ describe('FR-RES-01 IF-HW-03 the map of offers near the consumer', () => {
     expect(mocked.nearby).toHaveBeenCalledWith('consumer-token', { ...HERE, radiusKm: undefined });
     expect(mapProps()).toMatchObject({ center: HERE, radiusKm: 10 });
     expect(screen.getByText('Offers within 10 km')).toBeOnTheScreen();
+    // D-88: the slider is in the pop-up sheet of the distance chip.
+    await fireEvent.press(screen.getByTestId('offers-chip-distance'));
     expect(screen.getByTestId('offers-distance')).toHaveAccessibilityValue({
       min: 1,
       max: 50,
@@ -177,6 +179,8 @@ describe('FR-RES-01 IF-HW-03 the map of offers near the consumer', () => {
 describe('D-65 the distance slider zooms the map and loads the offers in range', () => {
   test('FR-RES-01 moving the slider up zooms out and loads that distance', async () => {
     await openHome();
+    // D-88: the slider is in the pop-up sheet of the distance chip.
+    await fireEvent.press(screen.getByTestId('offers-chip-distance'));
 
     await fireEvent(screen.getByTestId('offers-distance'), 'accessibilityAction', {
       nativeEvent: { actionName: 'increment' },
@@ -195,6 +199,7 @@ describe('D-65 the distance slider zooms the map and loads the offers in range',
     );
     await openHome();
     const calls = mocked.nearby.mock.calls.length;
+    await fireEvent.press(screen.getByTestId('offers-chip-distance'));
 
     await fireEvent(screen.getByTestId('offers-distance'), 'accessibilityAction', {
       nativeEvent: { actionName: 'decrement' },
@@ -342,5 +347,175 @@ describe('NFR-06 the consumer home and product page in Arabic', () => {
     // D-66: an offer written in English stays in English for an Arabic reader.
     expect(screen.getByTestId('offer-o1')).toHaveProp('accessibilityLabel', 'Koshari، ٤٠ جنيه');
     expect(screen.getByTestId('consumer-home')).toHaveStyle({ direction: 'rtl' });
+  });
+});
+
+// D-87 (Maryam, 2026-11-14): a maximum price and "I can pick up by" a time; they work together, keep the distance and
+// can be cleared. The vendor rating filter waits for ratings (a later story).
+// D-88 (Maryam, 2026-11-14, after the phone test): the distance and the filters are chips over the map; each chip opens
+// a pop-up sheet with its control, and price and pickup time are applied with an Apply button.
+describe('FR-RES-01 D-87 D-88 the offer filters', () => {
+  const lastQuery = () => mocked.nearby.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+  const LATER = '2099-01-01T12:00:00.000Z';
+  const apply = () => fireEvent.press(screen.getByRole('button', { name: 'Apply' }));
+
+  async function setMaxPrice(text: string) {
+    await fireEvent.press(screen.getByTestId('offers-chip-price'));
+    await fireEvent.changeText(screen.getByLabelText('Max price per bag (EGP)'), text);
+    await apply();
+  }
+
+  async function setPickupBy(iso: string) {
+    await fireEvent.press(screen.getByTestId('offers-chip-pickup'));
+    await fireEvent.changeText(screen.getByLabelText('I can pick up by'), iso);
+    await apply();
+  }
+
+  test('D-88 the distance, price and pickup time are chips over the map, and their controls start hidden', async () => {
+    await openHome();
+
+    expect(screen.getByTestId('offers-chip-distance')).toHaveTextContent('10 km', { exact: false });
+    expect(screen.getByTestId('offers-chip-price')).toHaveTextContent('Price', { exact: false });
+    expect(screen.getByTestId('offers-chip-pickup')).toHaveTextContent('Pickup time', { exact: false });
+    expect(screen.queryByTestId('offers-distance')).toBeNull();
+    expect(screen.queryByLabelText('Max price per bag (EGP)')).toBeNull();
+  });
+
+  test('NFR-07a D-88 each chip is a button that says what it sets and its value', async () => {
+    await openHome();
+
+    expect(screen.getByRole('button', { name: 'Distance, 10 km' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Max price per bag (EGP), Any price' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'I can pick up by, Any time' })).toBeOnTheScreen();
+  });
+
+  test('FR-RES-01 D-87 a maximum price is applied with Apply and loads only the offers at or below it', async () => {
+    await openHome();
+
+    await setMaxPrice('40');
+
+    await waitFor(() => expect(lastQuery()).toEqual({ ...HERE, radiusKm: 10, maxPrice: 40 }));
+    expect(screen.getByTestId('offers-chip-price')).toHaveTextContent('Up to 40 EGP', { exact: false });
+    // The sheet closes after Apply.
+    expect(screen.queryByLabelText('Max price per bag (EGP)')).toBeNull();
+  });
+
+  test('FR-RES-01 D-88 typing a price without Apply loads nothing', async () => {
+    await openHome();
+    const calls = mocked.nearby.mock.calls.length;
+    await fireEvent.press(screen.getByTestId('offers-chip-price'));
+
+    await fireEvent.changeText(screen.getByLabelText('Max price per bag (EGP)'), '40');
+
+    expect(mocked.nearby.mock.calls.length).toBe(calls);
+  });
+
+  test('FR-RES-01 D-87 a pickup time is applied with Apply and loads only the offers whose pickup starts by then', async () => {
+    await openHome();
+
+    await setPickupBy(LATER);
+
+    await waitFor(() => expect(lastQuery()).toEqual({ ...HERE, radiusKm: 10, pickupBy: LATER }));
+    expect(screen.getByTestId('offers-chip-pickup')).toHaveTextContent(`By ${formatDateTime(LATER, 'en')}`, { exact: false });
+  });
+
+  test('FR-RES-01 D-87 the filters work together and stay when the distance changes', async () => {
+    await openHome();
+    await setMaxPrice('40');
+    await setPickupBy(LATER);
+
+    await fireEvent.press(screen.getByTestId('offers-chip-distance'));
+    await fireEvent(screen.getByTestId('offers-distance'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    });
+
+    await waitFor(() =>
+      expect(lastQuery()).toEqual({ ...HERE, radiusKm: 11, maxPrice: 40, pickupBy: LATER }),
+    );
+    expect(screen.getByTestId('offers-chip-distance')).toHaveTextContent('11 km', { exact: false });
+  });
+
+  test('FR-RES-01 D-88 Clear in the price sheet removes only the price', async () => {
+    await openHome();
+    await setMaxPrice('40');
+    await setPickupBy(LATER);
+    await waitFor(() => expect(lastQuery()).toMatchObject({ maxPrice: 40, pickupBy: LATER }));
+
+    await fireEvent.press(screen.getByTestId('offers-chip-price'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Clear' }));
+
+    await waitFor(() => expect(lastQuery()).toEqual({ ...HERE, radiusKm: 10, pickupBy: LATER }));
+    expect(screen.getByTestId('offers-chip-price')).toHaveTextContent('Price', { exact: false });
+  });
+
+  test('FR-RES-01 D-87 filters with no results say so, and Clear filters loads every offer again', async () => {
+    mocked.nearby.mockImplementation((_token, query) =>
+      Promise.resolve({
+        kind: 'ok',
+        radius: { ...RADIUS, km: query.radiusKm ?? 10 },
+        offers: query.maxPrice === undefined ? OFFERS : [],
+      }),
+    );
+    await openHome();
+
+    await setMaxPrice('5');
+
+    expect(await screen.findByTestId('offers-empty')).toHaveTextContent(
+      'No offers match your filters within 10 km.',
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Clear filters' }));
+    await waitFor(() => expect(lastQuery()).toEqual({ ...HERE, radiusKm: 10 }));
+    expect(await screen.findByTestId('offer-o1')).toBeOnTheScreen();
+  });
+
+  test.each(['0', '-3', 'cheap'])('FR-RES-01 D-87 a maximum price of "%s" is marked and not sent', async (text) => {
+    await openHome();
+    const calls = mocked.nearby.mock.calls.length;
+
+    await setMaxPrice(text);
+
+    expect(await screen.findByText('Enter a price above 0.')).toBeOnTheScreen();
+    expect(mocked.nearby.mock.calls.length).toBe(calls);
+  });
+
+  test('FR-RES-01 D-87 a pickup time already passed is marked on Apply and not sent', async () => {
+    await openHome();
+    const calls = mocked.nearby.mock.calls.length;
+
+    await setPickupBy('2000-01-01T12:00:00.000Z');
+
+    expect(screen.getByLabelText('I can pick up by')).toHaveProp(
+      'accessibilityHint',
+      'Choose a time that has not passed.',
+    );
+    expect(mocked.nearby.mock.calls.length).toBe(calls);
+  });
+
+  test('D-88 choosing a pickup time is not marked as an error before Apply', async () => {
+    await openHome();
+    await fireEvent.press(screen.getByTestId('offers-chip-pickup'));
+
+    await fireEvent.changeText(screen.getByLabelText('I can pick up by'), '2000-01-01T12:00:00.000Z');
+
+    expect(screen.getByLabelText('I can pick up by')).not.toHaveProp(
+      'accessibilityHint',
+      'Choose a time that has not passed.',
+    );
+  });
+
+  test('NFR-06 D-88 the chips and filters are in Arabic', async () => {
+    await AsyncStorage.setItem('nowaste.language', 'ar');
+    mocked.getMe.mockResolvedValue({
+      kind: 'ok',
+      user: { id: 'c1', role: 'consumer', status: 'Active', language: 'ar' },
+    });
+    await renderApp('/home');
+    await screen.findByTestId('offer-o1');
+
+    expect(screen.getByTestId('offers-chip-distance')).toHaveTextContent('١٠ كم', { exact: false });
+    expect(screen.getByTestId('offers-chip-price')).toHaveTextContent('السعر', { exact: false });
+    await fireEvent.press(screen.getByTestId('offers-chip-price'));
+    expect(screen.getByLabelText('أقصى سعر للحقيبة (جنيه)')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'تطبيق' })).toBeOnTheScreen();
   });
 });

@@ -116,6 +116,8 @@ Source for the pickup location: docs/feedback-changes.md (each listing has its o
 | AT-US12-05 | Performance | A real provider (TBD-2) | 20 test photos are drafted | At least 18 return a draft within 10 seconds | NFR-02, BR-12 |
 | AT-US12-06 | Accuracy | A real provider (TBD-2) | 60 labelled photos are classified | At least 80% get the correct category | NFR-04 |
 | AT-US12-07 | Normal | AI-CONFIDENCE 0.7; a draft with low confidence | The vendor keeps the AI category and saves | The listing is Highly perishable | NFR-05d, D-80 |
+| AT-US12-08 | Normal | An informal vendor on Quick Post has chosen a photo, AI on | They tap "Fill in with AI draft", confirm or edit each Draft (AI) field, fill bags, price and pickup end, and post | Name, description (both languages) and category were filled and marked Draft (AI); posting is stopped until every one is confirmed or edited; then the Quick Post is published with both languages | FR-LST-02, FR-LST-03, NFR-05b, D-86 |
+| AT-US12-09 | Normal | AI on; a formal vendor on Create listing, or an informal vendor on Quick Post | They choose a photo and save or post without tapping "Fill in with AI draft" | It saves or posts normally, with nothing to confirm | NFR-05b, D-84, D-86 |
 
 ## US-13 Preparation/storage/expiry
 
@@ -157,6 +159,27 @@ Source for the values: SRS 5.5 BR-01, read from database tables (docs/feedback-c
 | AT-US19-05 | Normal | The vendor is creating a listing  | They mark the food as unfit for people | The food is offered only to composting partners                                                                                                                           | FR-RTE-07 |
 | AT-US19-06 | Error  | The routing recommendation fails  | The destination screen opens           | The vendor can choose from the eligible destinations without a recommendation                                                                                             | E-RTE-02  |
 | AT-US19-07 | Normal | The destination screen is open    | It is checked in Arabic and English    | Arabic is right-to-left, English left-to-right, no clipped or overlapping text                                                                                            | NFR-06    |
+
+## US-20 Highly perishable first, US-21 Rank by distance and time left (Sprint 2)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US20-01 | Normal | A consumer has a Highly perishable offer 6 km away and two others 1 km and 4 km away | They open the map | The Highly perishable offer is listed first, then the 1 km one, then the 4 km one | FR-RTE-08 |
+| AT-US20-02 | Normal | The same offers, with a filter on that all three match | They set the filter | The order is the same: Highly perishable first, then by distance | FR-RTE-08, D-87 |
+| AT-US21-01 | Normal | Two offers at the same branch whose pickups end at different times | They open the map | The offer whose pickup ends sooner is listed first (distance first, time left breaks ties, D-87) | FR-RTE-09 |
+
+## US-26 Map search and filters (Sprint 2)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US26-01 | Normal | A consumer on the map | They tap the "10 km" chip and move the slider in the sheet | It stops at 1 km and 50 km, starts at 10 km, the map and the offers follow, and the chip shows the new distance | FR-RES-01, D-88 |
+| AT-US26-02 | Normal | Offers priced 30, 40 and 45 EGP are in range | They tap the Price chip, type 40 and tap Apply | Only the 30 and 40 EGP offers are shown; the chip says "Up to 40 EGP"; typing without Apply changes nothing | FR-RES-01, D-87, D-88 |
+| AT-US26-03 | Normal | Offers whose pickups start in 10 minutes and in 2 hours | They tap the Pickup time chip, choose a day and a time one hour from now, and tap Apply | Only the offer starting in 10 minutes is shown; the field is not marked red while choosing | FR-RES-01, D-87, D-88 |
+| AT-US26-04 | Normal | A price and a pickup time are set | They change the distance, then tap Clear in the Price sheet | The filters stay when the distance changes; Clear removes only the price | FR-RES-01, D-87, D-88 |
+| AT-US26-05 | Error | A price or pickup sheet is open | They type 0 as the price, or choose a time that has passed, and tap Apply | The field says so, the sheet stays open and the offers are not reloaded | FR-RES-01, D-87 |
+| AT-US26-06 | Normal | No offer matches the filters | They set them | "No offers match your filters within 10 km." and a Clear filters button are shown | FR-RES-01, D-87 |
+| AT-US26-07 | Normal | The chips and sheets | They are checked in Arabic and with TalkBack | Arabic is right-to-left; each chip is read with what it sets and its value; the slider, fields and buttons are read with their labels | NFR-06, NFR-07a, D-88 |
+| AT-US26-08 | Normal | A consumer opens the map | They look at the screen | One row of chips sits over the map, the pins are visible, and the list starts at about a third of the screen and can be pulled up | FR-RES-01, D-88 |
 
 ## All stories: regression in CI
 

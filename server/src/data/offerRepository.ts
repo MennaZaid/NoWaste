@@ -53,20 +53,24 @@ const OFFER_WHERE = `l.status = 'Active' AND l.listing_type = 'Discounted Surplu
 
 /**
  * The offers within `radiusMeters` of the consumer: Highly perishable first (FR-RTE-08), then the nearest, and at
- * the same distance the one whose pickup ends sooner (FR-RTE-09).
+ * the same distance the one whose pickup ends sooner (FR-RTE-09). D-87: optionally only offers priced at or below
+ * `maxPrice` and whose pickup starts by `pickupBy` (null = no filter).
  */
 export async function findOffersNear(
   point: { latitude: number; longitude: number },
   radiusMeters: number,
   now: Date,
+  filters: { maxPrice: number | null; pickupBy: string | null } = { maxPrice: null, pickupBy: null },
 ): Promise<OfferRecord[]> {
   const result = await getPool().query<OfferRecord>(
     `WITH here AS (SELECT ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography AS g)
      SELECT ${OFFER_COLUMNS}, ST_Distance(l.location, here.g) AS "distanceMeters"
      ${OFFER_FROM} CROSS JOIN here
      WHERE ${OFFER_WHERE} AND ST_DWithin(l.location, here.g, $4)
+       AND ($5::numeric IS NULL OR l.price <= $5::numeric)
+       AND ($6::timestamptz IS NULL OR l.pickup_start <= $6::timestamptz)
      ORDER BY (l.perishability_category = 'Highly perishable') DESC, "distanceMeters", l.pickup_end, l.id`,
-    [now, point.latitude, point.longitude, radiusMeters],
+    [now, point.latitude, point.longitude, radiusMeters, filters.maxPrice, filters.pickupBy],
   );
   return result.rows;
 }

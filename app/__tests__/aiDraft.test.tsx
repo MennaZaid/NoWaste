@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { fireEvent, screen, waitFor } from 'expo-router/testing-library';
 import {
   createListing,
+  createQuickPost,
   getMe,
   getShop,
   previewPickBy,
@@ -31,6 +32,7 @@ jest.mock('@/api/client', () => ({
   getShop: jest.fn(),
   uploadListingPhoto: jest.fn(),
   createListing: jest.fn(),
+  createQuickPost: jest.fn(),
   previewPickBy: jest.fn(),
   getListing: jest.fn().mockResolvedValue({ kind: 'unexpected' }),
   downloadListingPhoto: jest.fn().mockResolvedValue(null),
@@ -55,6 +57,7 @@ const mocked = {
   getShop: jest.mocked(getShop),
   upload: jest.mocked(uploadListingPhoto),
   create: jest.mocked(createListing),
+  quick: jest.mocked(createQuickPost),
   preview: jest.mocked(previewPickBy),
   compress: jest.mocked(compressPhoto),
   camera: jest.mocked(ImagePicker.launchCameraAsync),
@@ -305,6 +308,180 @@ describe('NFR-06 the AI draft in Arabic', () => {
     await renderApp('/home');
     await fireEvent.press(await screen.findByTestId('home-create-listing'));
     await screen.findByTestId('listing-form');
+    await fireEvent.press(await screen.findByRole('button', { name: ar.listing.takePhoto }));
+    await fireEvent.press(await screen.findByRole('button', { name: ar.aiDraft.fill }));
+
+    await waitFor(() => expect(screen.getByLabelText(ar.listing.nameLabel)).toHaveDisplayValue('كشري'));
+    expect(screen.getByLabelText(ar.aiDraft.secondNameLabel)).toHaveDisplayValue('Koshari');
+    expect(screen.getByText(ar.aiDraft.notice)).toBeOnTheScreen();
+  });
+});
+
+describe('FR-LST-03 D-86 the AI is asked only when the vendor asks for a draft', () => {
+  test('FR-LST-03 D-86 the "Fill in with AI draft" upload asks the server for a draft', async () => {
+    await openForm();
+    await takePhoto();
+
+    await waitFor(() =>
+      expect(mocked.upload).toHaveBeenCalledWith('vendor-token', 'file:///small.jpg', { draft: true }),
+    );
+  });
+
+  test('NFR-05b D-86 a listing saved without asking for a draft uploads the photo without a draft request', async () => {
+    mocked.upload.mockResolvedValue({ kind: 'ok', photoKey: 'k.jpg' });
+    mocked.create.mockResolvedValue({ kind: 'invalid', fields: [] });
+    await openForm();
+    await fireEvent.press(screen.getByRole('button', { name: en.listing.takePhoto }));
+    await screen.findByTestId('listing-photo-preview');
+    await fireEvent.changeText(screen.getByLabelText(en.listing.nameLabel), 'Koshari');
+    await fireEvent.changeText(screen.getByLabelText(en.listing.descriptionLabel), 'Fresh koshari');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Cooked meals' }));
+    await fillTheRest();
+
+    await fireEvent.press(screen.getByRole('button', { name: en.listing.save }));
+
+    await waitFor(() => expect(mocked.create).toHaveBeenCalledTimes(1));
+    expect(mocked.upload).toHaveBeenCalledWith('vendor-token', 'file:///small.jpg');
+  });
+});
+
+// D-86 (SRS 4.2, Quick Post step 1): the informal vendor's Quick Post can be filled from the AI draft too.
+describe('FR-LST-02 FR-LST-03 D-86 Quick Post with the AI draft', () => {
+  beforeEach(() => {
+    mocked.getShop.mockResolvedValue({ kind: 'ok', shop: { ...SHOP, vendorType: 'informal' } });
+    mocked.quick.mockResolvedValue({ kind: 'unexpected' });
+  });
+
+  async function openQuick() {
+    await renderApp('/home');
+    await fireEvent.press(await screen.findByTestId('home-quick-post'));
+    await screen.findByTestId('quick-post-form');
+  }
+
+  async function fillQuickRest() {
+    await fireEvent.changeText(screen.getByLabelText('Price per bag (EGP)'), '25');
+    await fireEvent.changeText(screen.getByLabelText('Pickup ends'), '2099-01-01T12:00:00.000Z');
+  }
+
+  const postNow = () => fireEvent.press(screen.getByRole('button', { name: en.quickPost.submit }));
+
+  test('FR-LST-03 D-84 D-86 Quick Post: no AI call until the vendor asks for the draft', async () => {
+    await openQuick();
+    await fireEvent.press(screen.getByRole('button', { name: en.listing.takePhoto }));
+    await screen.findByTestId('listing-photo-preview');
+
+    expect(screen.getByRole('button', { name: en.aiDraft.fill })).toBeOnTheScreen();
+    expect(mocked.upload).not.toHaveBeenCalled();
+  });
+
+  test('FR-LST-02 FR-LST-03 D-86 Quick Post: the draft fills the name, description, both languages and category', async () => {
+    await openQuick();
+    await takePhoto();
+
+    await waitFor(() => expect(screen.getByLabelText(en.listing.nameLabel)).toHaveDisplayValue('Koshari'));
+    expect(mocked.upload).toHaveBeenCalledWith('vendor-token', 'file:///small.jpg', { draft: true });
+    expect(screen.getByLabelText(en.listing.descriptionLabel)).toHaveDisplayValue('Fresh koshari');
+    expect(screen.getByLabelText(en.aiDraft.secondNameLabel)).toHaveDisplayValue('كشري');
+    expect(screen.getByLabelText(en.aiDraft.secondDescriptionLabel)).toHaveDisplayValue('كشري طازج');
+    expect(screen.getByRole('radio', { name: 'Cooked meals' })).toBeChecked();
+    expect(screen.getByText(en.aiDraft.notice)).toBeOnTheScreen();
+    expect(screen.getByText('Estimate: about 4 portions')).toBeOnTheScreen();
+  });
+
+  test('NFR-05b D-86 Quick Post: posting with unconfirmed AI fields is stopped and the fields are marked', async () => {
+    await openQuick();
+    await takePhoto();
+    await waitFor(() => expect(confirmButtons()).toHaveLength(5));
+    await fillQuickRest();
+
+    await postNow();
+
+    expect(mocked.quick).not.toHaveBeenCalled();
+    expect(await screen.findAllByText(en.aiDraft.confirmNeeded)).toHaveLength(5);
+  });
+
+  test('NFR-05b D-86 Quick Post: confirming or editing each field posts it with both languages', async () => {
+    await openQuick();
+    await takePhoto();
+    await waitFor(() => expect(confirmButtons()).toHaveLength(5));
+    await fillQuickRest();
+
+    await fireEvent.changeText(screen.getByLabelText(en.listing.nameLabel), 'Koshari box');
+    for (const button of confirmButtons()) await fireEvent.press(button);
+    await postNow();
+
+    await waitFor(() => expect(mocked.quick).toHaveBeenCalledTimes(1));
+    expect(mocked.quick).toHaveBeenCalledWith(
+      'vendor-token',
+      expect.objectContaining({
+        photoKey: 'k.jpg',
+        name: 'Koshari box',
+        description: 'Fresh koshari',
+        language: 'en',
+        secondName: 'كشري',
+        secondDescription: 'كشري طازج',
+        foodCategory: 'cooked_meals',
+        confirmedAiFields: expect.arrayContaining([
+          'name',
+          'description',
+          'secondName',
+          'secondDescription',
+          'foodCategory',
+        ]),
+      }),
+    );
+    // The photo was uploaded once, when the draft was asked for.
+    expect(mocked.upload).toHaveBeenCalledTimes(1);
+  });
+
+  test('NFR-05b D-86 Quick Post: the server refusing unconfirmed AI fields marks them again', async () => {
+    mocked.quick.mockResolvedValue({ kind: 'invalid', fields: ['foodCategory'], unconfirmedAi: true });
+    await openQuick();
+    await takePhoto();
+    await waitFor(() => expect(confirmButtons()).toHaveLength(5));
+    await fillQuickRest();
+    for (const button of confirmButtons()) await fireEvent.press(button);
+
+    await postNow();
+
+    expect(await screen.findByText(en.aiDraft.confirmNeeded)).toBeOnTheScreen();
+  });
+
+  test('E-LST-01 NFR-03 D-86 Quick Post: no draft, the app says so and the vendor fills it by hand', async () => {
+    mocked.upload.mockResolvedValue({ kind: 'ok', photoKey: 'k.jpg', draft: null, draftError: 'E-LST-01' });
+    await openQuick();
+    await takePhoto();
+
+    expect(await screen.findByText(en.aiDraft.unavailable)).toBeOnTheScreen();
+    expect(screen.getByLabelText(en.listing.nameLabel)).toHaveDisplayValue('');
+    expect(screen.queryByLabelText(en.aiDraft.secondNameLabel)).toBeNull();
+    expect(confirmButtons()).toHaveLength(0);
+  });
+
+  test('NFR-05b D-86 Quick Post posted without asking for a draft uploads the photo without a draft request', async () => {
+    mocked.upload.mockResolvedValue({ kind: 'ok', photoKey: 'k.jpg' });
+    await openQuick();
+    await fireEvent.press(screen.getByRole('button', { name: en.listing.takePhoto }));
+    await screen.findByTestId('listing-photo-preview');
+    await fireEvent.changeText(screen.getByLabelText(en.listing.nameLabel), 'Mixed pastries');
+    await fireEvent.changeText(screen.getByLabelText(en.listing.descriptionLabel), 'From this morning');
+    await fillQuickRest();
+
+    await postNow();
+
+    await waitFor(() => expect(mocked.quick).toHaveBeenCalledTimes(1));
+    expect(mocked.upload).toHaveBeenCalledWith('vendor-token', 'file:///small.jpg');
+    const body = mocked.quick.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('confirmedAiFields');
+  });
+
+  test('NFR-06 D-86 Quick Post in Arabic: the main fields get the Arabic draft', async () => {
+    mocked.getMe.mockResolvedValue({
+      kind: 'ok',
+      user: { id: 'v1', role: 'vendor', status: 'Approved', language: 'ar' },
+    });
+    await AsyncStorage.setItem('nowaste.language', 'ar');
+    await openQuick();
     await fireEvent.press(await screen.findByRole('button', { name: ar.listing.takePhoto }));
     await fireEvent.press(await screen.findByRole('button', { name: ar.aiDraft.fill }));
 

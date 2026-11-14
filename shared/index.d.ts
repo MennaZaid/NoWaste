@@ -244,13 +244,18 @@ export type QuickPostField =
   | 'bagsTotal'
   | 'price'
   | 'pickupStart'
-  | 'pickupEnd';
+  | 'pickupEnd'
+  | 'secondName'
+  | 'secondDescription';
 
 export interface ValidQuickPost {
   photoKey: string;
   name: string;
   description: string;
   language: Language;
+  /** D-86: the text in the other language than `language`, from an AI draft, or null. */
+  secondName: string | null;
+  secondDescription: string | null;
   /** D-68: optional in the input; 'unknown' when not given. */
   foodCategory: ListingFoodCategory;
   bagsTotal: number;
@@ -271,6 +276,25 @@ export declare function validateQuickPost(
     /** D-75: optional; when the pickup starts. Without it, or when already passed, it is `now`. */
     pickupStart?: unknown;
     pickupEnd?: unknown;
+    /** D-86: optional; the name and description in the other language, from an AI draft. */
+    secondName?: unknown;
+    secondDescription?: unknown;
   },
   now: Date,
 ): { ok: true; value: ValidQuickPost } | { ok: false; error: 'E-LST-04'; fields: QuickPostField[] };
+
+/** D-87 (US-26): the consumer's offer filters; a missing filter is null. */
+export interface OfferFilters {
+  /** The most the consumer will pay for a bag, in EGP. */
+  maxPrice: number | null;
+  /** ISO time the consumer can come by: offers whose pickup starts by then. */
+  pickupBy: string | null;
+}
+
+export type OfferFilterField = 'maxPrice' | 'pickupBy';
+
+/** D-87: checks the filters; `pickupBy` must not be in the past. */
+export declare function validateOfferFilters(
+  input: { maxPrice?: unknown; pickupBy?: unknown },
+  now: Date,
+): { ok: true; value: OfferFilters } | { ok: false; fields: OfferFilterField[] };

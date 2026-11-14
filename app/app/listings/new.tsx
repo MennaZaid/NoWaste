@@ -240,7 +240,7 @@ export default function NewListingScreen() {
   function startUpload(uri: string) {
     resetDraft();
     setDrafting(true);
-    const result = preparePhoto(session, uri);
+    const result = preparePhoto(session, uri, { draft: true });
     upload.current = { uri, result };
     void result
       .then((answer) => {

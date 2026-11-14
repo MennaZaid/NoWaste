@@ -466,7 +466,25 @@
       "unreachable": "We could not reach the server. Check your connection and try again.",
       "unexpected": "Something went wrong. Please try again."
     },
-    "pair": "{{first}}, {{second}}"
+    "pair": "{{first}}, {{second}}",
+    "filters": {
+      "maxPriceLabel": "Max price per bag (EGP)",
+      "pickupByLabel": "I can pick up by",
+      "pickupByHint": "Shows offers whose pickup starts by this time.",
+      "anyTime": "Any time",
+      "clear": "Clear filters",
+      "priceError": "Enter a price above 0.",
+      "pickupByError": "Choose a time that has not passed.",
+      "empty": "No offers match your filters within {{km}} km.",
+      "priceChip": "Price",
+      "anyPrice": "Any price",
+      "upTo": "Up to {{price}}",
+      "pickupChip": "Pickup time",
+      "by": "By {{time}}",
+      "apply": "Apply",
+      "clearOne": "Clear",
+      "done": "Done"
+    }
   },
   "aiDraft": {
     "fill": "Fill in with AI draft",

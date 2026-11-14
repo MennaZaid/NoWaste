@@ -307,3 +307,87 @@ describe('D-65 the product page (GET /listings/nearby/:id) and its photo', () =>
     expect((await get(app, `/listings/nearby/${draft.id}/photo`, consumer)).status).toBe(404);
   });
 });
+
+// D-87 (Maryam, 2026-11-14): the price filter is a maximum price; the pickup-time filter is "I can come by" a time;
+// the vendor rating filter waits for ratings (a later story). Filters work together and leave the FR-RTE-08 / 09 order.
+describe('FR-RES-01 D-87 filter by maximum price', () => {
+  test('FR-RES-01 D-87 only offers at or below the maximum price are shown', async () => {
+    const cheap = await offerAt(1, { overrides: { price: 30 } });
+    const atMax = await offerAt(2, { overrides: { price: 40 } });
+    await offerAt(3, { overrides: { price: 40.01 } });
+
+    expect(idsOf((await nearby({ maxPrice: 40 })).body)).toEqual([cheap.id, atMax.id]);
+  });
+
+  test.each<[string, unknown]>([
+    ['0', 0],
+    ['a negative price', -5],
+    ['not a number', 'cheap'],
+  ])('FR-RES-01 D-87 a maximum price of %s is refused', async (_case, maxPrice) => {
+    const response = await nearby({ maxPrice });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_search', fields: ['maxPrice'] });
+  });
+});
+
+describe('FR-RES-01 D-87 filter by pickup time ("I can come by")', () => {
+  test('FR-RES-01 D-87 only offers whose pickup starts by the chosen time are shown', async () => {
+    const soon = await offerAt(1, { overrides: { pickupStart: at(10) } });
+    const exactly = await offerAt(2, { overrides: { pickupStart: at(60) } });
+    await offerAt(3, { overrides: { pickupStart: at(61) } });
+
+    expect(idsOf((await nearby({ pickupBy: at(60) })).body)).toEqual([soon.id, exactly.id]);
+  });
+
+  test('FR-RES-01 D-87 an offer whose pickup has already started still counts', async () => {
+    const started = await offerAt(1, { overrides: { pickupStart: at(10) } });
+    clock.now = () => new Date(NOW.getTime() + 20 * 60_000);
+
+    expect(idsOf((await nearby({ pickupBy: at(30) })).body)).toEqual([started.id]);
+  });
+
+  test.each<[string, unknown]>([
+    ['a time already passed', '2026-11-01T09:59:00.000Z'],
+    ['not a time', 'tonight'],
+  ])('FR-RES-01 D-87 a pickup time that is %s is refused', async (_case, pickupBy) => {
+    const response = await nearby({ pickupBy });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_search', fields: ['pickupBy'] });
+  });
+});
+
+describe('FR-RES-01 D-87 the filters work together', () => {
+  test('FR-RES-01 D-87 with both filters only offers matching both are shown', async () => {
+    const both = await offerAt(1, { overrides: { price: 30, pickupStart: at(10) } });
+    await offerAt(2, { overrides: { price: 30, pickupStart: at(120) } });
+    await offerAt(3, { overrides: { price: 60, pickupStart: at(10) } });
+
+    expect(idsOf((await nearby({ maxPrice: 40, pickupBy: at(60) })).body)).toEqual([both.id]);
+  });
+
+  test('FR-RES-01 D-87 filters with no results give an empty list, not an error', async () => {
+    await offerAt(1, { overrides: { price: 30 } });
+
+    const response = await nearby({ maxPrice: 10 });
+
+    expect(response.status).toBe(200);
+    expect(idsOf(response.body)).toEqual([]);
+  });
+
+  test('FR-RTE-08 D-87 a filter keeps the order: Highly perishable first, then by distance', async () => {
+    const longNear = await offerAt(1, { overrides: { storage: 'chilled', price: 30 } });
+    const highlyFar = await offerAt(5, { overrides: { price: 30 } });
+    await offerAt(2, { overrides: { price: 90 } });
+
+    expect(idsOf((await nearby({ maxPrice: 50 })).body)).toEqual([highlyFar.id, longNear.id]);
+  });
+
+  test('FR-RES-01 D-87 two or more errors are named together', async () => {
+    const response = await nearby({ radiusKm: 0, maxPrice: 0, pickupBy: 'tonight' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'invalid_search', fields: ['radiusKm', 'maxPrice', 'pickupBy'] });
+  });
+});

@@ -409,9 +409,14 @@ export interface AiDraft {
 /** The listing fields an AI draft can fill (D-81). */
 export type AiField = 'name' | 'description' | 'secondName' | 'secondDescription' | 'foodCategory';
 
+/**
+ * POST /listings/photo. D-84, D-86: `draft: true` only when the vendor tapped "Fill in with AI draft"; otherwise the
+ * server does not ask the AI, so a listing saved without a draft has nothing to confirm.
+ */
 export async function uploadListingPhoto(
   token: string,
   uri: string,
+  options: { draft?: boolean } = {},
 ): Promise<
   ListingAnswer<
     { kind: 'ok'; photoKey: string; draft?: AiDraft | null; draftError?: 'E-LST-01' } | { kind: 'failed' }
@@ -425,7 +430,7 @@ export async function uploadListingPhoto(
     return { kind: 'failed' };
   }
   const result = await protectedCall(
-    '/listings/photo',
+    options.draft === true ? '/listings/photo?draft=1' : '/listings/photo',
     { method: 'POST', body, headers: { 'Content-Type': 'image/jpeg' } },
     token,
   );
@@ -475,6 +480,10 @@ export type QuickPostRequest = {
   /** D-75: optional; undefined = the pickup starts when it is posted. */
   pickupStart: string | undefined;
   pickupEnd: string | undefined;
+  /** D-86: as for a full listing (D-81), the other-language AI draft text and the AI fields confirmed or edited. */
+  secondName?: string;
+  secondDescription?: string;
+  confirmedAiFields?: AiField[];
 };
 
 export type SaveListingResult = ListingAnswer<
@@ -836,16 +845,21 @@ export interface SearchRadius {
   stepKm: number;
 }
 
-/** GET /listings/nearby: offers near a point, in the FR-RTE-08 / FR-RTE-09 order. Without radiusKm: the default. */
+/**
+ * GET /listings/nearby: offers near a point, in the FR-RTE-08 / FR-RTE-09 order. Without radiusKm: the default.
+ * D-87: optional filters, a maximum price and "I can pick up by" a time.
+ */
 export async function getNearbyOffers(
   token: string,
-  query: { latitude: number; longitude: number; radiusKm?: number },
+  query: { latitude: number; longitude: number; radiusKm?: number; maxPrice?: number; pickupBy?: string },
 ): Promise<Protected<{ kind: 'ok'; radius: SearchRadius; offers: Offer[] }>> {
   const params = new URLSearchParams({
     latitude: String(query.latitude),
     longitude: String(query.longitude),
   });
   if (query.radiusKm !== undefined) params.set('radiusKm', String(query.radiusKm));
+  if (query.maxPrice !== undefined) params.set('maxPrice', String(query.maxPrice));
+  if (query.pickupBy !== undefined) params.set('pickupBy', query.pickupBy);
   const result = await protectedCall(`/listings/nearby?${params.toString()}`, {}, token);
   if (result.kind !== 'response') return result;
   const data = result.data;

@@ -195,11 +195,14 @@ async function maxPhotoBytes(): Promise<number> {
 /**
  * POST /listings/photo. NFR-08a: the app compresses the photo; the server still refuses anything over the limit
  * (413). Only JPEG and PNG pictures are kept (checked by their first bytes, not only by the declared type).
+ * D-84, D-86: the AI is asked for a draft only when the vendor asked for one (`wantDraft`); otherwise no draft is
+ * kept, so a listing saved without one has nothing to confirm (NFR-05b) and the photo is not sent to the AI.
  */
 export async function uploadPhoto(
   data: Buffer,
   contentType: string | undefined,
-): Promise<{ photoKey: string; draft: AiDraft | null; draftError?: 'E-LST-01' }> {
+  wantDraft = false,
+): Promise<{ photoKey: string; draft?: AiDraft | null; draftError?: 'E-LST-01' }> {
   if (data.length > (await maxPhotoBytes())) {
     throw new SrsError(413, { error: 'E-LST-04', fields: ['photo'] });
   }
@@ -208,6 +211,7 @@ export async function uploadPhoto(
   else if (contentType === 'image/png' && startsWith(data, PNG)) type = 'image/png';
   else throw invalidPhoto();
   const photoKey = await getStorage().save(data, type);
+  if (!wantDraft) return { photoKey };
   // US-12 FR-LST-03: the AI draft, or E-LST-01 (the vendor fills the form by hand).
   return { photoKey, ...(await draftForPhoto(photoKey, { data, type })) };
 }
@@ -424,6 +428,9 @@ export async function createListing(
  * description, bags, price and pickup end time. The pickup starts at the time of posting (decision D-43) at the main
  * branch, must be inside its opening hours, and ends within the BR-01 Highly perishable hours (D-61); the listing is
  * a Discounted Surplus Bag that is always Highly perishable (FR-RTE-02) and is published at once (SRS 4.2.2).
+ * D-86 (SRS 4.2 Quick Post step 1): the vendor may fill it from an AI draft; then every AI-filled field must be
+ * confirmed or edited (NFR-05b) and the other-language draft text is stored too (D-81). A Quick Post is always Highly
+ * perishable, so an uncertain AI category (NFR-05d) changes nothing here.
  */
 export async function createQuickPost(
   vendorId: string,
@@ -437,10 +444,14 @@ export async function createQuickPost(
     price?: unknown;
     pickupStart?: unknown;
     pickupEnd?: unknown;
+    secondName?: unknown;
+    secondDescription?: unknown;
+    confirmedAiFields?: unknown;
   },
 ): Promise<ListingView> {
   const check = validateQuickPost(input, clock.now());
   if (!check.ok) throw new SrsError(400, { error: 'E-LST-04', fields: check.fields });
+  const confirmed = parseConfirmed(input.confirmedAiFields);
   // Checked after the fields, so a formal vendor sending an empty form also learns what Quick Post needs.
   const shop = await shopOf(vendorId);
   if (shop.vendorType !== 'informal') {
@@ -448,6 +459,8 @@ export async function createQuickPost(
   }
   const post = check.value;
   await checkPhotoKey(post.photoKey);
+  // D-86 NFR-05b: with an AI draft for this photo, every AI-filled field is confirmed or edited.
+  checkConfirmed(await draftOf(post.photoKey), post, confirmed);
   const [main] = await findVendorBranches(vendorId);
   if (main === undefined) throw new Error('No branch for this vendor');
   const pickupStart = new Date(post.pickupStart);

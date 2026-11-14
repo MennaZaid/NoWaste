@@ -2,10 +2,10 @@
 import type { RequestHandler } from 'express';
 import { getOffer, getOfferPhoto, nearbyOffers } from '../../services/routing-feed/feedService.js';
 
-/** GET /listings/nearby?latitude&longitude&radiusKm */
+/** GET /listings/nearby?latitude&longitude&radiusKm, with the optional D-87 filters maxPrice and pickupBy */
 export const nearbyOffersHandler: RequestHandler = async (req, res) => {
-  const { latitude, longitude, radiusKm } = req.query;
-  res.json(await nearbyOffers({ latitude, longitude, radiusKm }));
+  const { latitude, longitude, radiusKm, maxPrice, pickupBy } = req.query;
+  res.json(await nearbyOffers({ latitude, longitude, radiusKm, maxPrice, pickupBy }));
 };
 
 /** GET /listings/nearby/:id: the product page. */

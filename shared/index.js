@@ -386,7 +386,8 @@ function validateListing(input) {
  * Checks a Quick Post (FR-LST-02, with name and description since D-63): photo, name and description in one
  * language, the number of bags, the price and the pickup end time. D-75: the pickup start is optional; without it the
  * pickup starts at the time of posting (`now`, decision D-43), and a start already passed is taken as now. The end
- * must be after the start. The server also checks the opening hours and the 6-hour limit.
+ * must be after the start. The server also checks the opening hours and the 6-hour limit. D-86: like a full listing
+ * (D-81), the name and description in the other language from an AI draft are optional.
  */
 function validateQuickPost(input, now) {
   const fields = [];
@@ -402,6 +403,10 @@ function validateQuickPost(input, now) {
   const start = Math.max(chosenStart ?? now.getTime(), now.getTime());
   const end = parseTime(input.pickupEnd);
   if (end === null || end <= start) fields.push('pickupEnd');
+  const secondName = optionalText(input.secondName, TEXT_LIMITS.name);
+  if (secondName === undefined) fields.push('secondName');
+  const secondDescription = optionalText(input.secondDescription, TEXT_LIMITS.description);
+  if (secondDescription === undefined) fields.push('secondDescription');
   if (fields.length > 0) return { ok: false, error: 'E-LST-04', fields };
   return {
     ok: true,
@@ -410,6 +415,8 @@ function validateQuickPost(input, now) {
       name: input.name.trim(),
       description: input.description.trim(),
       language: input.language,
+      secondName,
+      secondDescription,
       foodCategory,
       bagsTotal: input.bagsTotal,
       price: input.price,
@@ -443,6 +450,24 @@ function validateBranch(input) {
   };
 }
 
+/**
+ * D-87 (US-26, FR-RES-01): the consumer's offer filters, both optional. `maxPrice`: the most they will pay for a bag
+ * (offers at or below it are shown). `pickupBy`: the time they can come by; offers whose pickup starts by then are
+ * shown (one that has already started counts). It must not be in the past. The vendor rating filter waits for ratings.
+ */
+function validateOfferFilters(input, now) {
+  const fields = [];
+  const maxPrice = input.maxPrice === undefined ? null : input.maxPrice;
+  if (maxPrice !== null && !isPositiveAmount(maxPrice)) fields.push('maxPrice');
+  const pickupBy = input.pickupBy === undefined ? null : parseTime(input.pickupBy);
+  if (input.pickupBy !== undefined && (pickupBy === null || pickupBy < now.getTime())) fields.push('pickupBy');
+  if (fields.length > 0) return { ok: false, fields };
+  return {
+    ok: true,
+    value: { maxPrice, pickupBy: pickupBy === null ? null : new Date(pickupBy).toISOString() },
+  };
+}
+
 module.exports = {
   PASSWORD_RULES,
   LANGUAGES,
@@ -470,4 +495,5 @@ module.exports = {
   validateListing,
   validateQuickPost,
   validateBranch,
+  validateOfferFilters,
 };

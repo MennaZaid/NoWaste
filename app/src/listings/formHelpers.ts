@@ -24,8 +24,15 @@ export type PhotoUpload =
   | { kind: 'unauthorized' }
   | { kind: 'suspended' };
 
-/** Compresses the photo to the NFR-08a limit, then uploads it (C-26). */
-export async function preparePhoto(token: string, uri: string): Promise<PhotoUpload> {
+/**
+ * Compresses the photo to the NFR-08a limit, then uploads it (C-26). D-86: `{ draft: true }` asks the server for an AI
+ * draft (only when the vendor tapped "Fill in with AI draft").
+ */
+export async function preparePhoto(
+  token: string,
+  uri: string,
+  options?: { draft: boolean },
+): Promise<PhotoUpload> {
   let small: string | null;
   try {
     small = await compressPhoto(uri, PHOTO_MAX_BYTES);
@@ -33,7 +40,8 @@ export async function preparePhoto(token: string, uri: string): Promise<PhotoUpl
     return { kind: 'failed' };
   }
   if (small === null) return { kind: 'tooLarge' };
-  const result = await uploadListingPhoto(token, small);
+  const result =
+    options === undefined ? await uploadListingPhoto(token, small) : await uploadListingPhoto(token, small, options);
   // No connection or an unexpected answer is a failed upload: the form offers Retry (E-LST-02).
   return result.kind === 'unreachable' || result.kind === 'unexpected' ? { kind: 'failed' } : result;
 }

@@ -2,6 +2,7 @@
 // Tests come from FR-LST-03, E-LST-01, NFR-02 / BR-12 (10-second limit), NFR-03 (AI optional), NFR-05b (every
 // AI-filled field confirmed) and NFR-05d (uncertain AI estimate = Highly perishable). Decisions D-80 to D-83.
 // The vision provider is not chosen yet (TBD-2), so the tests replace the adapter with fakes through setVision.
+// D-86: the upload asks the AI only when the app asks for a draft (?draft=1), and Quick Post can use the draft too.
 import request from 'supertest';
 import { createApp } from '../src/api/app.js';
 import { closePool } from '../src/data/db.js';
@@ -13,7 +14,7 @@ import {
   type VisionResult,
 } from '../src/adapters/ai-vision/vision.js';
 import { deleteAllUsers, readListingRow, readSettingValue, setSettingValue } from './helpers/database.js';
-import { createVendor, jpeg, listingBody, post } from './helpers/listings.js';
+import { createVendor, jpeg, listingBody, post, quickPostBody } from './helpers/listings.js';
 
 const app = createApp();
 const NOW = new Date('2026-11-01T10:00:00.000Z');
@@ -34,9 +35,10 @@ const DRAFT: VisionResult = {
 
 const visionReturning = (result: VisionResult): IVision => ({ classify: () => Promise.resolve(result) });
 
+/** D-84, D-86: the upload the app sends when the vendor taps "Fill in with AI draft". */
 function upload(token: string) {
   return request(app)
-    .post('/listings/photo')
+    .post('/listings/photo?draft=1')
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'image/jpeg')
     .send(jpeg());
@@ -348,5 +350,141 @@ describe('NFR-05d an uncertain AI category gives Highly perishable', () => {
 
     expect(preview.status).toBe(200);
     expect(preview.body).toMatchObject({ category: 'Highly perishable' });
+  });
+});
+
+describe('FR-LST-03 D-84 D-86 the AI is asked only when the vendor asks for a draft', () => {
+  test('FR-LST-03 D-86 a photo uploaded without asking for a draft gets none, even with the AI on', async () => {
+    let calls = 0;
+    setVision({
+      classify: () => {
+        calls += 1;
+        return Promise.resolve(DRAFT);
+      },
+    });
+
+    const response = await request(app)
+      .post('/listings/photo')
+      .set('Authorization', `Bearer ${formal.token}`)
+      .set('Content-Type', 'image/jpeg')
+      .send(jpeg());
+
+    expect(response.status).toBe(201);
+    expect(Object.keys(response.body as object)).toEqual(['photoKey']);
+    expect(calls).toBe(0);
+  });
+
+  test('NFR-05b D-86 a listing saved without asking for a draft needs no confirmation, even with the AI on', async () => {
+    setVision(visionReturning(DRAFT));
+
+    const created = await post(app, '/listings', formal.token, await listingBody(app, formal.token, at));
+
+    expect(created.status).toBe(201);
+  });
+
+  test('NFR-05b D-86 a Quick Post posted without asking for a draft needs no confirmation, even with the AI on', async () => {
+    const informal = await createVendor(app, 'informal');
+    setVision(visionReturning(DRAFT));
+
+    const created = await post(app, '/listings/quick', informal.token, await quickPostBody(app, informal.token, at));
+
+    expect(created.status).toBe(201);
+  });
+});
+
+describe('FR-LST-02 FR-LST-03 D-86 a Quick Post can be filled from the AI draft', () => {
+  let informal: { id: string; token: string };
+
+  beforeAll(async () => {
+    informal = await createVendor(app, 'informal');
+  });
+
+  async function quickWithDraft(overrides: Record<string, unknown>) {
+    const { photoKey } = await uploadWith(informal.token, visionReturning(DRAFT));
+    return {
+      ...(await quickPostBody(app, informal.token, at)),
+      photoKey,
+      name: 'Koshari',
+      description: 'Fresh koshari with crispy onions',
+      language: 'en',
+      secondName: 'كشري',
+      secondDescription: 'كشري طازج بالبصل المقرمش',
+      foodCategory: 'cooked_meals',
+      ...overrides,
+    };
+  }
+
+  test('FR-LST-03 D-86 a Quick Post photo gets an AI draft when the vendor asks for one', async () => {
+    const body = await uploadWith(informal.token, visionReturning(DRAFT));
+
+    expect(body.draft).toMatchObject({ nameEn: 'Koshari', nameAr: 'كشري', foodCategory: 'cooked_meals' });
+  });
+
+  test('FR-LST-02 D-81 D-86 a Quick Post with the confirmed draft stores both languages and the AI category', async () => {
+    const created = await post(
+      app,
+      '/listings/quick',
+      informal.token,
+      await quickWithDraft({ confirmedAiFields: ALL_TEXT_FIELDS }),
+    );
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      isQuickPost: true,
+      status: 'Active',
+      nameEn: 'Koshari',
+      descriptionEn: 'Fresh koshari with crispy onions',
+      nameAr: 'كشري',
+      descriptionAr: 'كشري طازج بالبصل المقرمش',
+      perishabilityCategory: 'Highly perishable',
+    });
+    const row = await readListingRow((created.body as { id: string }).id);
+    expect(row).toMatchObject({ food_category: 'cooked_meals' });
+  });
+
+  test('FR-LST-02 D-86 an edited draft field is stored as the vendor edited it', async () => {
+    const created = await post(
+      app,
+      '/listings/quick',
+      informal.token,
+      await quickWithDraft({ name: 'Koshari box', confirmedAiFields: ALL_TEXT_FIELDS }),
+    );
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ nameEn: 'Koshari box' });
+  });
+
+  test('NFR-05b D-86 a Quick Post with an AI-filled field that was not confirmed is refused, naming the field', async () => {
+    const created = await post(
+      app,
+      '/listings/quick',
+      informal.token,
+      await quickWithDraft({ confirmedAiFields: ['name', 'description', 'secondName', 'secondDescription'] }),
+    );
+
+    expect(created.status).toBe(400);
+    expect(created.body).toEqual({ error: 'E-LST-04', fields: ['foodCategory'], unconfirmedAi: true });
+  });
+
+  test('E-LST-04 D-86 a Quick Post second-language name over 80 characters is refused', async () => {
+    const body = { ...(await quickPostBody(app, informal.token, at)), secondName: 'ك'.repeat(81) };
+
+    const created = await post(app, '/listings/quick', informal.token, body);
+
+    expect(created.status).toBe(400);
+    expect(created.body).toEqual({ error: 'E-LST-04', fields: ['secondName'] });
+  });
+
+  test('E-LST-01 NFR-03 D-86 without a draft the Quick Post is posted by hand', async () => {
+    const { photoKey } = await uploadWith(informal.token, {
+      classify: () => Promise.reject(new Error('down')),
+    });
+
+    const created = await post(app, '/listings/quick', informal.token, {
+      ...(await quickPostBody(app, informal.token, at)),
+      photoKey,
+    });
+
+    expect(created.status).toBe(201);
   });
 });

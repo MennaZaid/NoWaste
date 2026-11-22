@@ -657,5 +657,30 @@
     "sending": "Sending…",
     "notRejected": "Your application is no longer Rejected, so it cannot be sent again.",
     "loadFailed": "Your application could not be loaded. Try again."
+  },
+  "ramadan": {
+    "chip": "☾ Ramadan",
+    "chipOn": "Ramadan mode is on. Offers before iftar or suhoor are marked. Tap to turn it off.",
+    "chipOff": "Ramadan mode is off. Tap to mark offers you can pick up before iftar or suhoor.",
+    "before": {
+      "iftar": "Before iftar",
+      "suhoor": "Before suhoor"
+    },
+    "rowLabel": "{{name}}, {{price}}, {{meal}}",
+    "notSet": "Ramadan mode is on, but the iftar and suhoor times have not been set yet. No offers are marked.",
+    "loadFailed": "The Ramadan times could not be loaded. Check your connection and try again.",
+    "adminOpen": "Ramadan times",
+    "adminTitle": "Ramadan times",
+    "adminIntro": "Set today's iftar and suhoor times. Consumers in Ramadan mode see the offers they can pick up before them.",
+    "adminIntroLead": "Set today's iftar and suhoor times. Consumers in Ramadan mode see the offers they can pick up in the {{hours}} hours before them.",
+    "iftar": "Iftar time",
+    "suhoor": "Suhoor time",
+    "cairoTime": "Times are Cairo time. Update them each day of Ramadan.",
+    "invalidTime": "Choose a time.",
+    "sameTime": "Suhoor and iftar must be different times.",
+    "save": "Save times",
+    "saving": "Saving…",
+    "saved": "Ramadan times saved.",
+    "saveFailed": "The times could not be saved. Check your connection and try again."
   }
 }

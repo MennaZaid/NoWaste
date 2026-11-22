@@ -372,3 +372,21 @@ export declare function pickupStartProblem(
 
 /** FR-RES-10 (D-101): a typed pickup code of exactly `digits` digits (BR-09), in Western digits, or null. */
 export declare function parsePickupCode(value: unknown, digits: number): string | null;
+
+/** D-107 (US-45): administrator-set iftar and suhoor times, "HH:MM". */
+export interface RamadanTimes {
+  iftar: string;
+  suhoor: string;
+}
+export type RamadanTimesField = 'iftar' | 'suhoor';
+export declare function validateRamadanTimes(
+  input: unknown,
+): { ok: true; value: RamadanTimes } | { ok: false; fields: RamadanTimesField[] };
+export type RamadanMeal = 'iftar' | 'suhoor';
+/** D-107 (FR-TGI-08): the meal a pickup window comes before (overlaps the lead minutes before it), or null. */
+export declare function ramadanHighlight(
+  pickupStart: string | Date,
+  pickupEnd: string | Date,
+  moments: { iftarAt: string | Date; suhoorAt: string | Date },
+  leadMinutes: number,
+): RamadanMeal | null;

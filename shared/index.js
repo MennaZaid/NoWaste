@@ -550,6 +550,37 @@ function pickupStartProblem(start, now, rule) {
   return null;
 }
 
+/**
+ * D-107 (US-45, FR-TGI-08): the iftar and suhoor times the administrator sets. Both are required "HH:MM" times
+ * (Arabic-Indic digits allowed) and must differ. Returns { ok, value: { iftar, suhoor } } or { ok: false, fields }.
+ */
+function validateRamadanTimes(input) {
+  const source = typeof input === 'object' && input !== null ? input : {};
+  const iftar = parseClockTime(source.iftar);
+  const suhoor = parseClockTime(source.suhoor);
+  const fields = [];
+  if (iftar === null) fields.push('iftar');
+  if (suhoor === null) fields.push('suhoor');
+  if (iftar !== null && suhoor !== null && iftar === suhoor) fields.push('suhoor');
+  return fields.length > 0 ? { ok: false, fields } : { ok: true, value: { iftar, suhoor } };
+}
+
+/**
+ * D-107 (US-45, FR-TGI-08): which Ramadan meal a pickup window comes before. A window is highlighted when it overlaps
+ * the leadMinutes before the next iftar (or suhoor); iftar wins when both apply. Times are ISO strings or Dates.
+ * Returns 'iftar', 'suhoor' or null.
+ */
+function ramadanHighlight(pickupStart, pickupEnd, moments, leadMinutes) {
+  const start = new Date(pickupStart).getTime();
+  const end = new Date(pickupEnd).getTime();
+  const lead = leadMinutes * 60000;
+  for (const meal of ['iftar', 'suhoor']) {
+    const at = new Date(moments[meal + 'At']).getTime();
+    if (Number.isFinite(at) && start < at && end > at - lead) return meal;
+  }
+  return null;
+}
+
 module.exports = {
   PASSWORD_RULES,
   LANGUAGES,
@@ -585,4 +616,6 @@ module.exports = {
   REJECTION_REASONS,
   REJECTION_NOTE_MAX,
   validateRejection,
+  validateRamadanTimes,
+  ramadanHighlight,
 };

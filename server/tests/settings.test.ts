@@ -18,7 +18,8 @@ const expected: Array<[string, unknown]> = [
   ['BR-07', { no_shows: 3, within_days: 30, block_days: 14 }],
   ['BR-08', { no_shows: 3, within_days: 30 }],
   ['BR-09', { digits: 6 }],
-  ['BR-10', { minutes_before_window_end: null }],
+  // BR-10 was decided as 60 minutes by D-106 (TBD-5, 2026-11-21).
+  ['BR-10', { minutes_before_window_end: 60 }],
   ['BR-11', { refund: 'full' }],
   ['BR-12', { ai_draft_time_limit_seconds: 10 }],
 ];
@@ -49,10 +50,14 @@ describe('settings table (SRS 5.5 business rules)', () => {
     expect(row?.source).toContain('D-104');
   });
 
-  test('TBD-5 settings row exists with value null until the team decides it', async () => {
-    const row = await getSetting('TBD-5');
+  // TBD-5 was open (value null) until D-106 decided it on 2026-11-21.
+  test('BR-10 TBD-5 D-106 the TBD-5 row is decided as 60 minutes and BR-10 matches it', async () => {
+    const tbd5 = await getSetting('TBD-5');
+    const br10 = await getSetting('BR-10');
 
-    expect(row).toBeDefined();
-    expect(row?.value).toBeNull();
+    expect(tbd5?.value).toEqual({ minutes_before_window_end: 60 });
+    expect(br10?.value).toEqual(tbd5?.value);
+    expect(tbd5?.source).toContain('D-106');
+    expect(br10?.source).toContain('D-106');
   });
 });

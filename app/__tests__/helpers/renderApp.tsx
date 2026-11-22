@@ -8,6 +8,7 @@ import AppliedScreen from '../../app/applied';
 import LoginScreen from '../../app/login';
 import HomeScreen from '../../app/home';
 import ApplicationScreen from '../../app/admin/[userId]';
+import RamadanTimesScreen from '../../app/admin/ramadan';
 import NewListingScreen from '../../app/listings/new';
 import QuickPostScreen from '../../app/listings/quick';
 import ListingScreen from '../../app/listings/[id]';
@@ -30,6 +31,7 @@ export function renderApp(initialUrl = '/') {
       login: LoginScreen,
       home: HomeScreen,
       'admin/[userId]': ApplicationScreen,
+      'admin/ramadan': RamadanTimesScreen,
       'listings/new': NewListingScreen,
       'listings/quick': QuickPostScreen,
       'listings/[id]': ListingScreen,

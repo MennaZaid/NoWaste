@@ -9,6 +9,7 @@ import { logoutHandler } from './auth.js';
 import { createCardTokenHandler } from './mockBank.js';
 import { nearbyOffersHandler, offerHandler, offerPhotoHandler } from './feed.js';
 import { categoryHoursHandler } from './perishability.js';
+import { getRamadanHandler, setRamadanHandler } from './ramadan.js';
 import {
   addBranchHandler,
   chooseDestinationHandler,
@@ -83,6 +84,9 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   },
   // D-70: what each perishability category means in hours (BR-01).
   { method: 'get', path: '/perishability/categories', roles: EVERYONE, handler: categoryHoursHandler },
+  // US-45 (FR-TGI-08, D-107): consumers read the Ramadan times; the administrator sets them.
+  { method: 'get', path: '/ramadan', roles: ['consumer', 'admin'], handler: getRamadanHandler },
+  { method: 'patch', path: '/admin/ramadan', roles: ['admin'], handler: setRamadanHandler },
   { method: 'get', path: '/admin/applications', roles: ['admin'], handler: listApplicationsHandler },
   {
     method: 'post',

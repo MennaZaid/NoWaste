@@ -28,6 +28,10 @@ export async function chargeCard(amount: number, token: string): Promise<Payment
   });
   try {
     return await Promise.race([getPaymentGateway().charge(amount, token, clock.now()), timeout]);
+  } catch {
+    // NFR-12 (found in the SCRUM-81 NFR pass, 2026-11-21): a gateway that cannot be reached at all is handled like
+    // one that does not answer in time, so the pending reservation is dropped and the bag is free again (E-RES-01).
+    return { approved: false, reason: 'timeout' };
   } finally {
     clearTimeout(timer);
   }

@@ -1,6 +1,8 @@
 // Unit tests for @nowaste/shared, the one validator used by both the app and the server (US-01).
 // Password rules: decision D-11 (TBD-4). Phone format: decision D-12.
 import {
+  ramadanHighlight,
+  validateRamadanTimes,
   PASSWORD_RULES,
   checkPasswordRules,
   isValidEmail,
@@ -215,5 +217,37 @@ describe('FR-ACC-02 FR-ACC-03 D-105 shared application check (sign-up and sendin
   test('E-ACC-02 D-105 an invalid partner application lists its fields', () => {
     expect(validateApplication({ role: 'charity', partnerProfile: {} })).toMatchObject({ ok: false });
     expect(validateApplication({ role: 'consumer' })).toEqual({ ok: false, fields: ['role'] });
+  });
+});
+
+describe('FR-TGI-08 D-107 Ramadan rules (shared)', () => {
+  const moments = { iftarAt: '2026-11-21T15:05:00Z', suhoorAt: '2026-11-22T01:30:00Z' };
+
+  test.each([
+    ['a window ending in the 2 hours before iftar', '2026-11-21T12:00:00Z', '2026-11-21T13:30:00Z', 'iftar'],
+    [
+      'a window that starts before and ends after iftar',
+      '2026-11-21T14:30:00Z',
+      '2026-11-21T16:00:00Z',
+      'iftar',
+    ],
+    ['a window in the 2 hours before suhoor', '2026-11-21T23:45:00Z', '2026-11-22T00:30:00Z', 'suhoor'],
+    ['a morning window', '2026-11-21T07:00:00Z', '2026-11-21T09:00:00Z', null],
+    ['a window ending exactly when the lead starts', '2026-11-21T11:00:00Z', '2026-11-21T13:05:00Z', null],
+    ['a window that starts at iftar', '2026-11-21T15:05:00Z', '2026-11-21T17:00:00Z', null],
+  ])('FR-TGI-08 %s is highlighted as %s', (_name, start, end, meal) => {
+    expect(ramadanHighlight(start, end, moments, 120)).toBe(meal);
+  });
+
+  test('FR-TGI-08 Ramadan times accept Arabic-Indic digits and must differ', () => {
+    expect(validateRamadanTimes({ iftar: '١٧:٠٥', suhoor: '3:30' })).toEqual({
+      ok: true,
+      value: { iftar: '17:05', suhoor: '03:30' },
+    });
+    expect(validateRamadanTimes({ iftar: '17:05', suhoor: '17:05' })).toEqual({
+      ok: false,
+      fields: ['suhoor'],
+    });
+    expect(validateRamadanTimes(null)).toEqual({ ok: false, fields: ['iftar', 'suhoor'] });
   });
 });

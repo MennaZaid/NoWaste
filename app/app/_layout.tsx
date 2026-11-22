@@ -65,6 +65,7 @@ function Navigator() {
             }}
           />
           <Stack.Screen name="admin/[userId]" options={{ title: t('admin.detailsTitle') }} />
+          <Stack.Screen name="admin/ramadan" options={{ title: t('ramadan.adminTitle') }} />
           <Stack.Screen name="listings/new" options={{ title: t('listing.title') }} />
           <Stack.Screen name="listings/quick" options={{ title: t('quickPost.title') }} />
           <Stack.Screen name="listings/[id]" options={{ title: t('listing.detailsTitle') }} />

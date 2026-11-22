@@ -3,11 +3,12 @@
 // E-ACC-05: a Pending or Rejected vendor or partner sees the application status and no food functions.
 // E-ACC-06: a Suspended account sees that it is suspended. The administrator home lists Pending applications (US-07).
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import type { Edge } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { roleGroupOf, useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
+import { Button } from '@/components/Button';
 import { ApplicationsList } from '@/components/ApplicationsList';
 import { ConsumerHome } from '@/components/ConsumerHome';
 import { Notice } from '@/components/Notice';
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const { phase, token, user, suspended } = useAuth();
   // Set by the application details screen after a decision (US-07).
   const { decided } = useLocalSearchParams<{ decided?: string }>();
+  const router = useRouter();
 
   if (phase === 'restoring') {
     return (
@@ -86,6 +88,15 @@ export default function HomeScreen() {
             <Notice tone="info" message={t(`admin.${decided}`)} />
           ) : null}
           <ApplicationsList />
+          {/* US-45 (D-107): the administrator sets the Ramadan iftar and suhoor times. */}
+          <Button
+            testID="admin-ramadan"
+            variant="secondary"
+            label={t('ramadan.adminOpen')}
+            onPress={() => {
+              router.push('/admin/ramadan');
+            }}
+          />
         </View>
       </Screen>
     );

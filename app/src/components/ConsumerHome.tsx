@@ -13,8 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { validateOfferFilters, type OfferFilters } from '@nowaste/shared';
-import { getNearbyOffers, type Offer, type SearchRadius } from '@/api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ramadanHighlight, validateOfferFilters, type OfferFilters, type RamadanMeal } from '@nowaste/shared';
+import { getNearbyOffers, getRamadan, type Offer, type RamadanView, type SearchRadius } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { formatDateTime } from '@/listings/formatDateTime';
@@ -39,6 +40,9 @@ type Problem = 'unreachable' | 'unexpected';
 const NO_FILTERS: OfferFilters = { maxPrice: null, pickupBy: null };
 
 type Sheet = 'distance' | 'price' | 'pickup';
+
+// US-45 (D-107): Ramadan mode is remembered on this phone.
+export const RAMADAN_MODE_KEY = 'nowaste.ramadanMode';
 
 /** D-88: one chip over the map; filled when its filter is set. */
 function Chip({
@@ -69,8 +73,18 @@ function Chip({
   );
 }
 
-/** One row of the panel: photo, name and price (D-65). */
-function OfferRow({ token, offer, onPress }: { token: string; offer: Offer; onPress: () => void }) {
+/** One row of the panel: photo, name and price (D-65); in Ramadan mode, "Before iftar" or "Before suhoor" (US-45). */
+function OfferRow({
+  token,
+  offer,
+  onPress,
+  highlight = null,
+}: {
+  token: string;
+  offer: Offer;
+  onPress: () => void;
+  highlight?: RamadanMeal | null;
+}) {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const name = listingText(offer, language).name ?? t('quickPost.title');
@@ -79,10 +93,18 @@ function OfferRow({ token, offer, onPress }: { token: string; offer: Offer; onPr
     <Pressable
       testID={`offer-${offer.id}`}
       accessibilityRole="button"
-      accessibilityLabel={t('offers.pair', { first: name, second: price })}
+      accessibilityLabel={
+        highlight === null
+          ? t('offers.pair', { first: name, second: price })
+          : t('ramadan.rowLabel', { name, price, meal: t(`ramadan.before.${highlight}`) })
+      }
       accessibilityHint={t('offers.openHint')}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        highlight !== null && styles.rowRamadan,
+        pressed && styles.rowPressed,
+      ]}
     >
       <ListingPhoto
         testID={`offer-photo-${offer.id}`}
@@ -96,6 +118,12 @@ function OfferRow({ token, offer, onPress }: { token: string; offer: Offer; onPr
         <AppText color="primary" variant="label">
           {price}
         </AppText>
+        {highlight !== null ? (
+          <AppText testID={`offer-ramadan-${offer.id}`} variant="caption" color="primary">
+            {'☾ '}
+            {t(`ramadan.before.${highlight}`)}
+          </AppText>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -129,6 +157,45 @@ export function ConsumerHome() {
   const [pickupDraft, setPickupDraft] = useState<string | null>(null);
   const [priceError, setPriceError] = useState(false);
   const [pickupError, setPickupError] = useState(false);
+  // US-45 (FR-TGI-08, D-107): Ramadan mode and the iftar and suhoor times the administrator set.
+  const [ramadanOn, setRamadanOn] = useState(false);
+  const [ramadan, setRamadan] = useState<RamadanView | null>(null);
+  const [ramadanFailed, setRamadanFailed] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        if ((await AsyncStorage.getItem(RAMADAN_MODE_KEY)) === 'on') setRamadanOn(true);
+      } catch {
+        // Not remembered: Ramadan mode starts off.
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!ramadanOn || token === null) return undefined;
+    let active = true;
+    void getRamadan(token).then((result) => {
+      if (!active) return;
+      setRamadanFailed(result.kind !== 'ok');
+      if (result.kind === 'ok') setRamadan(result.ramadan);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ramadanOn, token]);
+
+  function toggleRamadan() {
+    const next = !ramadanOn;
+    setRamadanOn(next);
+    void AsyncStorage.setItem(RAMADAN_MODE_KEY, next ? 'on' : 'off').catch(() => undefined);
+  }
+
+  /** The meal an offer comes before, when Ramadan mode is on and the times are set. */
+  function highlightOf(offer: Offer): RamadanMeal | null {
+    if (!ramadanOn || ramadan === null || !ramadan.set) return null;
+    return ramadanHighlight(offer.pickupStart, offer.pickupEnd, ramadan, ramadan.leadMinutes);
+  }
 
   const placeAt = useCallback((here: Coordinates | null) => {
     setCenter(here ?? FALLBACK_CENTER);
@@ -314,6 +381,12 @@ export function ConsumerHome() {
             <Button variant="secondary" label={t('offers.tryLocationAgain')} onPress={locate} />
           </Notice>
         ) : null}
+        {ramadanOn && ramadanFailed ? (
+          <Notice testID="ramadan-failed" tone="info" message={t('ramadan.loadFailed')} />
+        ) : null}
+        {ramadanOn && ramadan !== null && !ramadan.set ? (
+          <Notice testID="ramadan-not-set" tone="info" message={t('ramadan.notSet')} />
+        ) : null}
         {/* D-88: one slim row of chips, so the map stays visible. */}
         <View style={styles.chips}>
           {radiusSettings !== null ? (
@@ -335,6 +408,13 @@ export function ConsumerHome() {
             onPress={() => {
               openSheet('price');
             }}
+          />
+          <Chip
+            testID="offers-chip-ramadan"
+            text={t('ramadan.chip')}
+            accessibilityLabel={t(ramadanOn ? 'ramadan.chipOn' : 'ramadan.chipOff')}
+            active={ramadanOn}
+            onPress={toggleRamadan}
           />
           <Chip
             testID="offers-chip-pickup"
@@ -511,6 +591,7 @@ export function ConsumerHome() {
               <OfferRow
                 token={session}
                 offer={item}
+                highlight={highlightOf(item)}
                 onPress={() => {
                   router.push({ pathname: '/offers/[id]', params: { id: item.id } });
                 }}
@@ -578,6 +659,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+  },
+  // US-45: a highlighted offer has a thicker green border (the label says why; colour is not the only cue).
+  rowRamadan: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.accent,
   },
   rowPressed: {
     backgroundColor: colors.accent,

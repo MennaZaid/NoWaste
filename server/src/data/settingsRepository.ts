@@ -16,3 +16,12 @@ export async function getSetting(key: string): Promise<SettingRow | undefined> {
   );
   return result.rows[0];
 }
+
+/** Replaces the value of one settings row; false when the row does not exist. */
+export async function setSettingValue(key: string, value: unknown): Promise<boolean> {
+  const result = await getPool().query('UPDATE settings SET value = $2 WHERE key = $1', [
+    key,
+    JSON.stringify(value),
+  ]);
+  return (result.rowCount ?? 0) > 0;
+}

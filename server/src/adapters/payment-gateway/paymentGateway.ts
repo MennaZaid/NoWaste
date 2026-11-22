@@ -38,3 +38,8 @@ export function getPaymentGateway(): IPaymentGateway {
   gateway ??= createMockBankGateway();
   return gateway;
 }
+
+/** Tests put another gateway in place, for example one that is down (NFR-12); undefined goes back to the bank. */
+export function setPaymentGateway(next: IPaymentGateway | undefined): void {
+  gateway = next;
+}

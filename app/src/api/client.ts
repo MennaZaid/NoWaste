@@ -1311,3 +1311,41 @@ export function verifyPickup(token: string, listingId: string, code: string): Pr
 export function completePickup(token: string, listingId: string, code: string): Promise<PickupAnswer> {
   return pickupCall(token, listingId, 'complete', code);
 }
+
+/** US-45 Ramadan mode (FR-TGI-08, D-107): the times the administrator set, and the next iftar and suhoor. */
+export type RamadanView =
+  | { set: false; leadMinutes: number }
+  | { set: true; iftar: string; suhoor: string; leadMinutes: number; iftarAt: string; suhoorAt: string };
+
+function isRamadanView(data: unknown): data is RamadanView {
+  return typeof data === 'object' && data !== null && typeof (data as { set?: unknown }).set === 'boolean';
+}
+
+/** GET /ramadan (consumers and the administrator). */
+export async function getRamadan(token: string): Promise<Protected<{ kind: 'ok'; ramadan: RamadanView }>> {
+  const result = await protectedCall('/ramadan', {}, token);
+  if (result.kind !== 'response') return result;
+  return result.status === 200 && isRamadanView(result.data)
+    ? { kind: 'ok', ramadan: result.data }
+    : { kind: 'unexpected' };
+}
+
+/** PATCH /admin/ramadan {iftar, suhoor} (administrator). 400 names the invalid fields. */
+export async function setRamadanTimes(
+  token: string,
+  times: { iftar: string; suhoor: string },
+): Promise<
+  Protected<{ kind: 'ok'; ramadan: RamadanView } | { kind: 'invalid'; fields: ('iftar' | 'suhoor')[] }>
+> {
+  const result = await protectedCall(
+    '/admin/ramadan',
+    { method: 'PATCH', body: JSON.stringify(times) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status === 200 && isRamadanView(result.data)) return { kind: 'ok', ramadan: result.data };
+  if (result.status === 400 && Array.isArray(result.data?.fields)) {
+    return { kind: 'invalid', fields: result.data.fields as ('iftar' | 'suhoor')[] };
+  }
+  return { kind: 'unexpected' };
+}

@@ -8,7 +8,19 @@ import { decideHandler, listApplicationsHandler } from './admin.js';
 import { logoutHandler } from './auth.js';
 import { createCardTokenHandler } from './mockBank.js';
 import { nearbyOffersHandler, offerHandler, offerPhotoHandler } from './feed.js';
+import {
+  acceptOfferHandler,
+  cancelPickupHandler,
+  getOfferHandler,
+  listOffersHandler,
+  listPickupsHandler,
+  listingPartnerPickupHandler,
+  getAutoCharityHandler,
+  setAutoCharityHandler,
+  listingAutoOfferHandler,
+} from './partnerOffers.js';
 import { categoryHoursHandler } from './perishability.js';
+import { donateZakatHandler, myZakatHandler, zakatCharitiesHandler, zakatReceiptHandler } from './zakat.js';
 import { getRamadanHandler, setRamadanHandler } from './ramadan.js';
 import {
   addBranchHandler,
@@ -115,6 +127,16 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   { method: 'get', path: '/listings/nearby', roles: ['consumer'], handler: nearbyOffersHandler },
   { method: 'get', path: '/listings/nearby/:id', roles: ['consumer'], handler: offerHandler },
   { method: 'get', path: '/listings/nearby/:id/photo', roles: ['consumer'], handler: offerPhotoHandler },
+  // US-43 (FR-TGI-05, FR-TGI-06, D-113 to D-116): Zakat donation and its receipt.
+  {
+    method: 'get',
+    path: '/listings/nearby/:id/charities',
+    roles: ['consumer'],
+    handler: zakatCharitiesHandler,
+  },
+  { method: 'post', path: '/listings/nearby/:id/zakat', roles: ['consumer'], handler: donateZakatHandler },
+  { method: 'get', path: '/zakat', roles: ['consumer'], handler: myZakatHandler },
+  { method: 'get', path: '/zakat/:id', roles: ['consumer', 'partner'], handler: zakatReceiptHandler },
   { method: 'get', path: '/listings/:id', roles: ['vendor'], handler: getListingHandler },
   // US-15 (FR-LST-06) and the listing photo: a vendor sees only their own listings.
   { method: 'get', path: '/listings', roles: ['vendor'], handler: getMyListingsHandler },
@@ -142,12 +164,59 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
     roles: ['vendor'],
     handler: listingReservationsHandler,
   },
+  // US-23 (FR-RTE-11, D-112): automatic charity offers.
+  { method: 'get', path: '/vendors/me/auto-charity', roles: ['vendor'], handler: getAutoCharityHandler },
+  { method: 'patch', path: '/vendors/me/auto-charity', roles: ['vendor'], handler: setAutoCharityHandler },
+  { method: 'get', path: '/listings/:id/auto-charity', roles: ['vendor'], handler: listingAutoOfferHandler },
+  // US-22 (D-108 to D-110): the charity that collects a Donation, for the vendor.
+  {
+    method: 'get',
+    path: '/listings/:id/partner-pickup',
+    roles: ['vendor'],
+    handler: listingPartnerPickupHandler,
+  },
   { method: 'post', path: '/listings/:id/pickups/verify', ...APPROVED_VENDOR, handler: verifyPickupHandler },
   {
     method: 'post',
     path: '/listings/:id/pickups/complete',
     ...APPROVED_VENDOR,
     handler: completePickupHandler,
+  },
+  // US-22 (FR-RTE-10, D-108): Approved charity partners take Donations and schedule the pickup (E-ACC-05 otherwise).
+  {
+    method: 'get',
+    path: '/partner/offers',
+    roles: ['partner'],
+    approvedOnly: true,
+    handler: listOffersHandler,
+  },
+  {
+    method: 'get',
+    path: '/partner/offers/:id',
+    roles: ['partner'],
+    approvedOnly: true,
+    handler: getOfferHandler,
+  },
+  {
+    method: 'post',
+    path: '/partner/offers/:id/accept',
+    roles: ['partner'],
+    approvedOnly: true,
+    handler: acceptOfferHandler,
+  },
+  {
+    method: 'get',
+    path: '/partner/pickups',
+    roles: ['partner'],
+    approvedOnly: true,
+    handler: listPickupsHandler,
+  },
+  {
+    method: 'post',
+    path: '/partner/pickups/:id/cancel',
+    roles: ['partner'],
+    approvedOnly: true,
+    handler: cancelPickupHandler,
   },
   // US-28, US-30 (SDD C-09): consumers reserve without a card and check in. /no-show-standing before /:id.
   // D-99: the pretend bank's card page (stands in for the payment gateway; the card never reaches NoWaste).

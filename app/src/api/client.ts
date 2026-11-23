@@ -1267,6 +1267,8 @@ export type PickupRefusal = 'wrong_code' | 'already_used' | 'expired' | 'not_sta
 
 type PickupAnswer = Protected<
   | { kind: 'ok'; reservation: Pick<VendorReservationRow, 'id' | 'number' | 'method' | 'status'> }
+  // US-22 (D-110): the code was a charity's, for a Donation.
+  | { kind: 'partner'; pickup: PartnerPickup }
   | { kind: 'refused'; reason: PickupRefusal; startsAt?: string }
   | { kind: 'notFound' }
 >;
@@ -1293,6 +1295,10 @@ async function pickupCall(
     };
   }
   if (result.status === 404) return { kind: 'notFound' };
+  const partnerPickup = result.data?.partnerPickup;
+  if (result.status === 200 && typeof partnerPickup === 'object' && partnerPickup !== null) {
+    return { kind: 'partner', pickup: partnerPickup as unknown as PartnerPickup };
+  }
   const reservation = result.data?.reservation;
   return result.status === 200 && typeof reservation === 'object' && reservation !== null
     ? {
@@ -1348,4 +1354,307 @@ export async function setRamadanTimes(
     return { kind: 'invalid', fields: result.data.fields as ('iftar' | 'suhoor')[] };
   }
   return { kind: 'unexpected' };
+}
+
+// US-22 Charity pickup (FR-RTE-10, E-RTE-03, E-RTE-04), decisions D-108 to D-110.
+
+/** A Donation (charities) or Compost offer (composting partners, US-24) a partner can take. */
+export interface PartnerOffer {
+  listingId: string;
+  listingType: 'Donation' | 'Compost offer';
+  shopName: string;
+  address: string;
+  nameAr: string | null;
+  nameEn: string | null;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  sourceLanguage: Language | null;
+  foodCategory: string | null;
+  bags: number;
+  pickupStart: string;
+  pickupEnd: string;
+  distanceMeters: number;
+  latitude: number;
+  longitude: number;
+}
+
+/** A pickup a charity accepted. The vendor gets it without the code. */
+export interface PartnerPickup {
+  id: string;
+  listingId: string;
+  organisationName: string;
+  status: 'Accepted' | 'Completed' | 'Cancelled';
+  listingType: 'Donation' | 'Compost offer';
+  pickupTime: string;
+  pickupCode: string | null;
+  shopName: string;
+  address: string;
+  nameAr: string | null;
+  nameEn: string | null;
+  sourceLanguage: Language | null;
+  foodCategory: string | null;
+  bags: number;
+  pickupStart: string;
+  pickupEnd: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** GET /partner/offers: not_food_partner for "other" partners (D-111). */
+export async function getPartnerOffers(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; offers: PartnerOffer[] } | { kind: 'notFoodPartner' }>> {
+  const result = await protectedCall('/partner/offers', { method: 'GET' }, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === 403 && result.data?.error === 'not_food_partner') return { kind: 'notFoodPartner' };
+  const offers = result.data?.offers;
+  return result.status === 200 && Array.isArray(offers)
+    ? { kind: 'ok', offers: offers as unknown as PartnerOffer[] }
+    : { kind: 'unexpected' };
+}
+
+/** GET /partner/offers/:id */
+export async function getPartnerOffer(
+  token: string,
+  listingId: string,
+): Promise<Protected<{ kind: 'ok'; offer: PartnerOffer } | { kind: 'notFound' }>> {
+  const result = await protectedCall(
+    `/partner/offers/${encodeURIComponent(listingId)}`,
+    { method: 'GET' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', offer: result.data as unknown as PartnerOffer }
+    : { kind: 'unexpected' };
+}
+
+/** POST /partner/offers/:id/accept {pickupTime}: E-RTE-03 gives the allowed times, E-RTE-04 that it was taken. */
+export async function acceptPartnerOffer(
+  token: string,
+  listingId: string,
+  pickupTime: string,
+): Promise<
+  Protected<
+    | { kind: 'ok'; pickup: PartnerPickup }
+    | { kind: 'outsideWindow'; earliest?: string; latest?: string }
+    | { kind: 'taken' }
+    | { kind: 'notFound' }
+  >
+> {
+  const result = await protectedCall(
+    `/partner/offers/${encodeURIComponent(listingId)}/accept`,
+    { method: 'POST', body: JSON.stringify({ pickupTime }) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (result.status === 201 && data !== null) return { kind: 'ok', pickup: data as unknown as PartnerPickup };
+  if (result.status === 400 && data?.error === 'E-RTE-03') {
+    return {
+      kind: 'outsideWindow',
+      ...(typeof data.earliest === 'string' ? { earliest: data.earliest } : {}),
+      ...(typeof data.latest === 'string' ? { latest: data.latest } : {}),
+    };
+  }
+  if (result.status === 409 && data?.error === 'E-RTE-04') return { kind: 'taken' };
+  if (result.status === 404) return { kind: 'notFound' };
+  return { kind: 'unexpected' };
+}
+
+/** GET /partner/pickups: the charity's pickups, the newest first. */
+export async function getPartnerPickups(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; pickups: PartnerPickup[] } | { kind: 'notFoodPartner' }>> {
+  const result = await protectedCall('/partner/pickups', { method: 'GET' }, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === 403 && result.data?.error === 'not_food_partner') return { kind: 'notFoodPartner' };
+  const pickups = result.data?.pickups;
+  return result.status === 200 && Array.isArray(pickups)
+    ? { kind: 'ok', pickups: pickups as unknown as PartnerPickup[] }
+    : { kind: 'unexpected' };
+}
+
+/** POST /partner/pickups/:id/cancel ("Partner cancels"). */
+export async function cancelPartnerPickup(
+  token: string,
+  pickupId: string,
+): Promise<
+  Protected<{ kind: 'ok'; pickup: PartnerPickup } | { kind: 'notCancellable' } | { kind: 'notFound' }>
+> {
+  const result = await protectedCall(
+    `/partner/pickups/${encodeURIComponent(pickupId)}/cancel`,
+    { method: 'POST' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status === 409) return { kind: 'notCancellable' };
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', pickup: result.data as unknown as PartnerPickup }
+    : { kind: 'unexpected' };
+}
+
+/** GET /listings/:id/partner-pickup: the charity that collects a Donation, for the vendor (no code). */
+export async function getListingPartnerPickup(
+  token: string,
+  listingId: string,
+): Promise<Protected<{ kind: 'ok'; pickup: PartnerPickup | null }>> {
+  const result = await protectedCall(
+    `/listings/${encodeURIComponent(listingId)}/partner-pickup`,
+    { method: 'GET' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status !== 200 || result.data === null) return { kind: 'unexpected' };
+  const pickup = result.data.pickup;
+  return {
+    kind: 'ok',
+    pickup: typeof pickup === 'object' && pickup !== null ? (pickup as unknown as PartnerPickup) : null,
+  };
+}
+
+// US-23 Automatic charity offers (FR-RTE-11, D-112).
+
+/** GET /vendors/me/auto-charity */
+export async function getAutoCharity(token: string): Promise<Protected<{ kind: 'ok'; optIn: boolean }>> {
+  const result = await protectedCall('/vendors/me/auto-charity', { method: 'GET' }, token);
+  if (result.kind !== 'response') return result;
+  const optIn = result.data?.autoCharityOptIn;
+  return result.status === 200 && typeof optIn === 'boolean' ? { kind: 'ok', optIn } : { kind: 'unexpected' };
+}
+
+/** PATCH /vendors/me/auto-charity {optIn} */
+export async function setAutoCharity(
+  token: string,
+  optIn: boolean,
+): Promise<Protected<{ kind: 'ok'; optIn: boolean }>> {
+  const result = await protectedCall(
+    '/vendors/me/auto-charity',
+    { method: 'PATCH', body: JSON.stringify({ optIn }) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const value = result.data?.autoCharityOptIn;
+  return result.status === 200 && typeof value === 'boolean'
+    ? { kind: 'ok', optIn: value }
+    : { kind: 'unexpected' };
+}
+
+/** GET /listings/:id/auto-charity: when the unreserved bags were offered to charities, or null. */
+export async function getListingAutoOffer(
+  token: string,
+  listingId: string,
+): Promise<Protected<{ kind: 'ok'; offer: { offeredAt: string; bags: number } | null }>> {
+  const result = await protectedCall(
+    `/listings/${encodeURIComponent(listingId)}/auto-charity`,
+    { method: 'GET' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status !== 200 || result.data === null) return { kind: 'unexpected' };
+  const offer = result.data.offer as { offeredAt?: unknown; bags?: unknown } | null | undefined;
+  return typeof offer?.offeredAt === 'string' && typeof offer.bags === 'number'
+    ? { kind: 'ok', offer: { offeredAt: offer.offeredAt, bags: offer.bags } }
+    : { kind: 'ok', offer: null };
+}
+
+// US-43 Zakat donation and receipt (FR-TGI-05, FR-TGI-06, E-TGI-02), decisions D-113 to D-116.
+
+export interface ZakatCharity {
+  id: string;
+  name: string;
+  distanceMeters: number;
+}
+
+export interface ZakatReceipt {
+  id: string;
+  receiptNumber: string;
+  status: 'Paid' | 'Delivered' | 'Refunded';
+  shopName: string;
+  foodName: string;
+  nameAr: string | null;
+  nameEn: string | null;
+  bags: number;
+  amount: number;
+  charityName: string;
+  createdAt: string;
+  deliveredAt: string | null;
+  refundedAt: string | null;
+}
+
+/** GET /listings/nearby/:id/charities: the charities that accept the offer's food type. */
+export async function getZakatCharities(
+  token: string,
+  listingId: string,
+): Promise<Protected<{ kind: 'ok'; charities: ZakatCharity[] } | { kind: 'notFound' }>> {
+  const result = await protectedCall(
+    `/listings/nearby/${encodeURIComponent(listingId)}/charities`,
+    { method: 'GET' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status === 404) return { kind: 'notFound' };
+  const charities = result.data?.charities;
+  return result.status === 200 && Array.isArray(charities)
+    ? { kind: 'ok', charities: charities as unknown as ZakatCharity[] }
+    : { kind: 'unexpected' };
+}
+
+/** POST /listings/nearby/:id/zakat: pays for the bags with the bank's one-time token and gives them as Zakat. */
+export async function donateZakat(
+  token: string,
+  listingId: string,
+  body: { charityId: string; bags: number; paymentToken: string },
+): Promise<
+  Protected<
+    | { kind: 'ok'; receipt: ZakatReceipt }
+    | { kind: 'paymentFailed'; reason: PaymentFailure }
+    | { kind: 'notEnoughBags' }
+    | { kind: 'invalid'; fields: string[] }
+    | { kind: 'notFound' }
+  >
+> {
+  const result = await protectedCall(
+    `/listings/nearby/${encodeURIComponent(listingId)}/zakat`,
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  if (result.status === 201 && data !== null) return { kind: 'ok', receipt: data as unknown as ZakatReceipt };
+  if (result.status === 402 && data?.error === 'E-TGI-02') {
+    return { kind: 'paymentFailed', reason: data.reason as PaymentFailure };
+  }
+  if (result.status === 409 && data?.error === 'E-RES-02') return { kind: 'notEnoughBags' };
+  if (result.status === 400 && Array.isArray(data?.fields))
+    return { kind: 'invalid', fields: data.fields as string[] };
+  if (result.status === 404) return { kind: 'notFound' };
+  return { kind: 'unexpected' };
+}
+
+/** GET /zakat: the consumer's Zakat receipts, the newest first. */
+export async function getMyZakat(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; receipts: ZakatReceipt[] }>> {
+  const result = await protectedCall('/zakat', { method: 'GET' }, token);
+  if (result.kind !== 'response') return result;
+  const receipts = result.data?.receipts;
+  return result.status === 200 && Array.isArray(receipts)
+    ? { kind: 'ok', receipts: receipts as unknown as ZakatReceipt[] }
+    : { kind: 'unexpected' };
+}
+
+/** GET /zakat/:id: one receipt. */
+export async function getZakatReceipt(
+  token: string,
+  id: string,
+): Promise<Protected<{ kind: 'ok'; receipt: ZakatReceipt } | { kind: 'notFound' }>> {
+  const result = await protectedCall(`/zakat/${encodeURIComponent(id)}`, { method: 'GET' }, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', receipt: result.data as unknown as ZakatReceipt }
+    : { kind: 'unexpected' };
 }

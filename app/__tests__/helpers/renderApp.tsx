@@ -19,6 +19,11 @@ import ReservationScreen from '../../app/reservations/[id]';
 import MyReservationsScreen from '../../app/reservations/index';
 import ProfileScreen from '../../app/profile';
 import PayScreen from '../../app/pay/[id]';
+import PartnerOfferScreen from '../../app/partner/offers/[id]';
+import PartnerPickupScreen from '../../app/partner/pickups/[id]';
+import ZakatDonateScreen from '../../app/zakat/new/[id]';
+import ZakatReceiptScreen from '../../app/zakat/[id]';
+import ZakatReceiptsScreen from '../../app/zakat/index';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -42,6 +47,11 @@ export function renderApp(initialUrl = '/') {
       'reservations/index': MyReservationsScreen,
       profile: ProfileScreen,
       'pay/[id]': PayScreen,
+      'partner/offers/[id]': PartnerOfferScreen,
+      'partner/pickups/[id]': PartnerPickupScreen,
+      'zakat/new/[id]': ZakatDonateScreen,
+      'zakat/[id]': ZakatReceiptScreen,
+      'zakat/index': ZakatReceiptsScreen,
     },
     { initialUrl },
   );

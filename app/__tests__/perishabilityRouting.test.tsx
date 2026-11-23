@@ -23,6 +23,10 @@ import { LANGUAGE_STORAGE_KEY } from '@/i18n/languageStorage';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: false }),
+  setAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: true }),
+  getListingAutoOffer: jest.fn().mockResolvedValue({ kind: 'ok', offer: null }),
+  getListingPartnerPickup: jest.fn().mockResolvedValue({ kind: 'ok', pickup: null }),
   // US-32 (D-101): a published listing also loads its reservations.
   getListingReservations: jest.fn().mockResolvedValue({ kind: 'unexpected' }),
   isServerHealthy: jest.fn().mockResolvedValue(true),

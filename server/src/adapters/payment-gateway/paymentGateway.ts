@@ -3,7 +3,7 @@
 // TBD-2); during the course payments use a sandbox only (IF-SW-07), so Sprint 2 has the pretend bank of decision D-99
 // (`mock_bank` schema, docs/test-cards.md). Card details never reach NoWaste: the app sends them to the bank's card
 // page (mockBankCardPage.ts) and NoWaste gets only a one-time token (NFR-10, IF-SW-02).
-import { chargeToken } from '../../data/mockBankRepository.js';
+import { chargeToken, refundCharge } from '../../data/mockBankRepository.js';
 
 export type DeclineReason =
   'invalid_token' | 'unknown_card' | 'wrong_details' | 'expired_card' | 'declined' | 'insufficient_funds';
@@ -17,6 +17,8 @@ export interface IPaymentGateway {
    * answer; the Payment Service applies the PAYMENT-TIMEOUT limit.
    */
   charge(amount: number, token: string, now: Date): Promise<GatewayAnswer>;
+  /** SDD refund(paymentId, amount): gives the amount of an approved charge back to the card (E-TGI-03, BR-11). */
+  refund(reference: string, amount: number, now: Date): Promise<{ refunded: boolean }>;
 }
 
 /** The pretend bank (D-99). A card whose behaviour is `no_answer` never answers, to test the timeout. */
@@ -27,6 +29,9 @@ export function createMockBankGateway(): IPaymentGateway {
       if (outcome.status === 'approved') return { approved: true, reference: outcome.reference };
       if (outcome.status === 'declined') return { approved: false, reason: outcome.reason };
       return new Promise<GatewayAnswer>(() => undefined);
+    },
+    async refund(reference, amount, now) {
+      return { refunded: await refundCharge(reference, amount, now) };
     },
   };
 }

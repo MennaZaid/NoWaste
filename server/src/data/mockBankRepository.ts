@@ -113,3 +113,44 @@ export async function chargeToken(token: string, amount: number, now: Date): Pro
     client.release();
   }
 }
+
+/**
+ * US-43 (E-TGI-03, BR-11): the pretend bank gives the amount of an approved charge back to the card it came from,
+ * once. Returns false for an unknown or declined charge, or one already refunded.
+ */
+export async function refundCharge(reference: string, amount: number, now: Date): Promise<boolean> {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const charge = await client.query<{ numberHash: string }>(
+      `SELECT t.number_hash AS "numberHash" FROM mock_bank.charges c JOIN mock_bank.tokens t ON t.token = c.token
+       WHERE c.reference::text = $1 AND c.status = 'approved' FOR UPDATE OF c`,
+      [reference],
+    );
+    const numberHash = charge.rows[0]?.numberHash;
+    if (numberHash === undefined) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    const refund = await client.query(
+      `INSERT INTO mock_bank.refunds (charge_reference, amount, created_at) VALUES ($1::uuid, $2, $3)
+       ON CONFLICT (charge_reference) DO NOTHING`,
+      [reference, amount, now],
+    );
+    if ((refund.rowCount ?? 0) === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('UPDATE mock_bank.cards SET balance = balance + $2 WHERE number_hash = $1', [
+      numberHash,
+      amount,
+    ]);
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}

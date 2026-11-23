@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { getListing, publishListing, type Listing } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
+import { AutoOfferNote } from '@/components/AutoOfferNote';
+import { DonationPickup } from '@/components/DonationPickup';
 import { VendorReservations } from '@/components/VendorReservations';
 import { Button } from '@/components/Button';
 import { ListingPhoto } from '@/components/ListingPhoto';
@@ -177,6 +179,14 @@ export default function ListingScreen() {
                 onChange={setListing}
                 onSessionEnded={sessionEnded}
               />
+            ) : null}
+            {/* US-23 (D-112): unreserved bags offered to charities automatically. */}
+            {listing.status !== 'Draft' && listing.listingType === 'Discounted Surplus Bag' ? (
+              <AutoOfferNote token={session} listingId={listing.id} />
+            ) : null}
+            {/* US-22 (D-110): the charity that collects a published Donation. */}
+            {listing.status !== 'Draft' && listing.listingType === 'Donation' ? (
+              <DonationPickup token={session} listingId={listing.id} />
             ) : null}
             {/* US-32, US-33 (D-101): the reservations of a published listing and the pickup code. */}
             {listing.status !== 'Draft' ? (

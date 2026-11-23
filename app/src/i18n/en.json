@@ -574,7 +574,8 @@
     "newPasswordInvalid": "The new password does not follow the rules below.",
     "currentRequired": "Enter your current password.",
     "failed": "Something went wrong. Check your connection and try again.",
-    "logout": "Log out"
+    "logout": "Log out",
+    "zakat": "Zakat receipts"
   },
   "payment": {
     "title": "Pay by card",
@@ -682,5 +683,89 @@
     "saving": "Saving…",
     "saved": "Ramadan times saved.",
     "saveFailed": "The times could not be saved. Check your connection and try again."
+  },
+  "partnerOffers": {
+    "offersTab": "Offers",
+    "pickupsTab": "My pickups",
+    "tabsLabel": "Donation offers or your pickups",
+    "offersEmpty": "No Donation offers near you right now.",
+    "pickupsEmpty": "You have not accepted any pickups yet.",
+    "failed": "Could not load this. Check your connection and try again.",
+    "bags": "Bags: {{count}}",
+    "window": "Pickup: {{start}} to {{end}}",
+    "distance": "{{km}} km away",
+    "offerTitle": "Donation offer",
+    "pickupTimeLabel": "When will you collect it?",
+    "pickupTimeHint": "Between {{start}} and {{end}}",
+    "accept": "Accept and schedule pickup",
+    "accepting": "Accepting…",
+    "chooseTime": "Choose when you will collect it.",
+    "outsideWindow": "Choose a time between {{start}} and {{end}}.",
+    "taken": "Another charity has already accepted this donation.",
+    "notFound": "This offer is no longer available.",
+    "pickupTitle": "Your pickup",
+    "codeLabel": "Pickup code",
+    "codeHint": "Show this code to the vendor when you collect the food.",
+    "pickupAt": "Collect at {{time}}",
+    "cancel": "Cancel pickup",
+    "cancelling": "Cancelling…",
+    "cancelled": "Pickup cancelled. The donation is offered to other charities again.",
+    "notCancellable": "This pickup can no longer be cancelled.",
+    "statuses": {
+      "Accepted": "Scheduled",
+      "Completed": "Collected",
+      "Cancelled": "Cancelled"
+    },
+    "vendorTitle": "Donation pickup",
+    "vendorNone": "No charity has accepted this donation yet.",
+    "vendorLine": "{{name}} collects at {{time}}",
+    "charityFound": "Charity: {{name}} · collects at {{time}}",
+    "charityHandedOver": "Handed over to {{name}}.",
+    "notFoodPartner": "Food offers are for charity and composting partners.",
+    "types": {
+      "Donation": "Donation",
+      "Compost offer": "Compost offer"
+    }
+  },
+  "autoCharity": {
+    "label": "Offer unreserved bags to charities",
+    "hint": "When on, bags nobody has reserved near the end of the pickup time (the time set by the administrator) are offered to nearby charities as a donation.",
+    "failed": "Could not save. Try again.",
+    "offered": "{{count}} unreserved bags were offered to charities at {{time}}."
+  },
+  "zakat": {
+    "donate": "Donate as Zakat",
+    "title": "Donate as Zakat",
+    "intro": "Pay for bags and give them to a charity. The charity collects them, and you get a receipt.",
+    "bagsLabel": "Number of bags",
+    "charityLabel": "Charity",
+    "noCharity": "No charity near this vendor accepts this food right now.",
+    "chooseCharity": "Choose a charity.",
+    "pay": "Pay {{amount}} and donate",
+    "paying": "Paying…",
+    "notEnoughBags": "There are not enough bags left. Choose fewer.",
+    "notFound": "This offer is no longer available.",
+    "distance": "{{km}} km from the vendor",
+    "receiptTitle": "Zakat receipt",
+    "receiptsTitle": "Zakat receipts",
+    "receiptsEmpty": "You have not donated as Zakat yet.",
+    "number": "Receipt number",
+    "status": "Status",
+    "vendor": "Vendor",
+    "food": "Food",
+    "bags": "Bags",
+    "amount": "Amount",
+    "charity": "Charity",
+    "date": "Date",
+    "delivered": "Delivered",
+    "refunded": "Refunded",
+    "statuses": {
+      "Paid": "Paid, waiting for the charity to collect",
+      "Delivered": "Delivered to the charity",
+      "Refunded": "Not collected, refunded in full"
+    },
+    "share": "Share as PDF",
+    "shareFailed": "Could not make the PDF. Try again.",
+    "failed": "Could not load this. Check your connection and try again."
   }
 }

@@ -24,6 +24,10 @@ import { formatTime } from '@/listings/formatDateTime';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: false }),
+  setAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: true }),
+  getListingAutoOffer: jest.fn().mockResolvedValue({ kind: 'ok', offer: null }),
+  getListingPartnerPickup: jest.fn().mockResolvedValue({ kind: 'ok', pickup: null }),
   isServerHealthy: jest.fn().mockResolvedValue(true),
   logout: jest.fn().mockResolvedValue(undefined),
   getMe: jest.fn(),

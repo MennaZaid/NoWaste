@@ -199,6 +199,15 @@ export default function OfferScreen() {
                 router.push({ pathname: '/pay/[id]', params: { id: offer.id } });
               }}
             />
+            {/* US-43 (FR-TGI-05, D-116): pay for bags and give them to a charity as Zakat. */}
+            <Button
+              testID="offer-zakat"
+              variant="secondary"
+              label={t('zakat.donate')}
+              onPress={() => {
+                router.push({ pathname: '/zakat/new/[id]', params: { id: offer.id } });
+              }}
+            />
             <AppText variant="label" color="textMuted">
               {t('offers.orReserve')}
             </AppText>

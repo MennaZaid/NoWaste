@@ -26,7 +26,10 @@ import { Notice } from './Notice';
 import { TextField } from './TextField';
 
 const REFRESH_MS = 60_000;
-type Found = { id: string; number: number; method: 'card' | 'no-card' };
+// US-22 (D-110): the code may be a charity's, for a Donation.
+type Found =
+  | { kind: 'reservation'; id: string; number: number; method: 'card' | 'no-card' }
+  | { kind: 'partner'; name: string; pickupTime: string };
 type Message = { tone: 'info' | 'error'; text: string };
 
 function isToCollect(row: VendorReservationRow): boolean {
@@ -92,9 +95,25 @@ export function VendorReservations({
     setMessage(null);
     const result = await (step === 'verify' ? verifyPickup : completePickup)(token, listingId, code);
     setBusy(false);
+    if (result.kind === 'partner') {
+      const charity = {
+        kind: 'partner' as const,
+        name: result.pickup.organisationName,
+        pickupTime: result.pickup.pickupTime,
+      };
+      if (step === 'verify') {
+        setFound(charity);
+        return;
+      }
+      setFound(null);
+      setCode('');
+      setMessage({ tone: 'info', text: t('partnerOffers.charityHandedOver', { name: charity.name }) });
+      reload();
+      return;
+    }
     if (result.kind === 'ok') {
       if (step === 'verify') {
-        setFound(result.reservation);
+        setFound({ kind: 'reservation', ...result.reservation });
         return;
       }
       setFound(null);
@@ -181,7 +200,14 @@ export function VendorReservations({
       ) : (
         <View testID="vendor-code-confirm" style={styles.confirm}>
           <AppText variant="label">{t('vendorReservations.confirmTitle')}</AppText>
-          <AppText>{`${t('vendorReservations.number', { number: found.number })} · ${method(found.method)}`}</AppText>
+          <AppText>
+            {found.kind === 'partner'
+              ? t('partnerOffers.charityFound', {
+                  name: found.name,
+                  time: formatTime(found.pickupTime, language),
+                })
+              : `${t('vendorReservations.number', { number: found.number })} · ${method(found.method)}`}
+          </AppText>
           <Button
             testID="vendor-code-handover"
             label={t('vendorReservations.handOver')}

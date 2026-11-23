@@ -10,6 +10,7 @@ import { getShop, type Shop } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from './AppText';
 import { Button } from './Button';
+import { AutoCharitySwitch } from './AutoCharitySwitch';
 import { Notice } from './Notice';
 import { spacing } from '@/theme';
 
@@ -93,6 +94,8 @@ export function VendorHome() {
           router.push('/vendor/hours');
         }}
       />
+      {/* US-23 (FR-RTE-11, D-112): automatic charity offers. */}
+      {token !== null ? <AutoCharitySwitch token={token} /> : null}
     </View>
   );
 }

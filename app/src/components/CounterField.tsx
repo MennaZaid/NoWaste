@@ -13,6 +13,8 @@ interface CounterFieldProps {
   onChange: (value: number) => void;
   /** The smallest value; the minus button is disabled there. */
   min: number;
+  /** US-43: the largest value, when there is one (the bags left); the plus button does nothing there. */
+  max?: number;
   error?: string;
   testID?: string;
 }
@@ -21,7 +23,7 @@ interface CounterFieldProps {
 const SIZE = 36;
 const SLOP = (minTouchSize - SIZE) / 2;
 
-export function CounterField({ label, value, onChange, min, error, testID }: CounterFieldProps) {
+export function CounterField({ label, value, onChange, min, max, error, testID }: CounterFieldProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const shown = localDigits(value, language);
@@ -38,7 +40,7 @@ export function CounterField({ label, value, onChange, min, error, testID }: Cou
           accessibilityLabel={t('counter.increase', { label })}
           hitSlop={SLOP}
           onPress={() => {
-            onChange(value + 1);
+            onChange(max === undefined ? value + 1 : Math.min(max, value + 1));
           }}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >

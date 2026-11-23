@@ -1,8 +1,12 @@
 // Entry point 2 of 2 (SDD 2.4): the Scheduler / Worker, SDD C-19. It runs beside the API, not under it
 // (docs/feedback-changes.md), and calls the same application services.
-// Jobs (SDD 5.5): expire no-card holds (FR-RES-05, US-28). How often it checks is the settings row C-19.
+// Jobs (SDD 5.5): expire no-card holds (FR-RES-05, US-28), make automatic charity offers (FR-RTE-11, US-23) and
+// refund uncollected Zakat donations (E-TGI-03, BR-11, US-43).
+// How often it checks is the settings row C-19.
 import { getSetting } from './data/settingsRepository.js';
+import { makeAutomaticCharityOffers } from './services/partner-offer/autoCharityOfferService.js';
 import { releaseExpiredHolds } from './services/reservation/reservationService.js';
+import { refundUncollectedZakat } from './services/zakat-receipt/zakatService.js';
 
 async function pollSeconds(): Promise<number> {
   const value = (await getSetting('C-19'))?.value as { poll_seconds?: unknown } | null | undefined;
@@ -19,6 +23,18 @@ async function tick(): Promise<void> {
   } catch (error) {
     // One failed run must not stop the worker; the next run picks up the same due holds (SDD 5.5).
     console.error('worker: releasing expired holds failed', error);
+  }
+  try {
+    const offered = await makeAutomaticCharityOffers();
+    if (offered > 0) console.log(`worker: offered ${String(offered)} listing(s) to charities`);
+  } catch (error) {
+    console.error('worker: automatic charity offers failed', error);
+  }
+  try {
+    const refunded = await refundUncollectedZakat();
+    if (refunded > 0) console.log(`worker: refunded ${String(refunded)} uncollected Zakat donation(s)`);
+  } catch (error) {
+    console.error('worker: Zakat refunds failed', error);
   }
 }
 

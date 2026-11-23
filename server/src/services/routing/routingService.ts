@@ -40,7 +40,7 @@ export interface Destinations {
 }
 
 /** The FR-RTE-05 settings row: partner radius in km, null = no limit (open question 49). */
-async function radiusMeters(): Promise<number | null> {
+export async function radiusMeters(): Promise<number | null> {
   const value = (await getSetting('FR-RTE-05'))?.value as { partner_radius_km?: unknown } | null | undefined;
   const km = value?.partner_radius_km;
   return typeof km === 'number' && km > 0 ? km * 1000 : null;

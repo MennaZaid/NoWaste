@@ -9,7 +9,7 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { colors, minTouchSize, radius, spacing } from '@/theme';
 import { AppText } from './AppText';
 
-type Item = { key: 'active' | 'past' | 'edit'; go: () => void };
+type Item = { key: 'active' | 'past' | 'zakat' | 'edit'; go: () => void };
 
 export function ProfileMenu() {
   const { t } = useTranslation();
@@ -26,6 +26,8 @@ export function ProfileMenu() {
     // types (app/.expo/types, made by expo start and not in git).
     { key: 'active', go: () => router.push('/reservations?scope=active' as Href) },
     { key: 'past', go: () => router.push('/reservations?scope=past' as Href) },
+    // US-43 (FR-TGI-06): the consumer's Zakat receipts.
+    { key: 'zakat', go: () => router.push('/zakat' as Href) },
     { key: 'edit', go: () => router.push('/profile') },
   ];
 

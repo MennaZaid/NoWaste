@@ -182,6 +182,48 @@ Source for the values: SRS 5.5 BR-01, read from database tables (docs/feedback-c
 | AT-US26-08 | Normal | A consumer opens the map | They look at the screen | One row of chips sits over the map, the pins are visible, and the list starts at about a third of the screen and can be pulled up | FR-RES-01, D-88 |
 
 
+## US-22 Charity pickup (Sprint 3, D-108 to D-110)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US22-01 | Normal | A vendor publishes a listing with destination Charity; an Approved charity accepts its food type | The charity opens Offers | The Donation is listed with store, address, bags, distance and pickup window | FR-RTE-10 |
+| AT-US22-02 | Normal | The charity opens the offer | It chooses a time inside the window and taps Accept | The pickup opens as Scheduled with a 6-digit pickup code | FR-RTE-10, BR-09 |
+| AT-US22-03 | Normal | A charity that does not accept the food type, or a composting partner | It opens its home | The Donation is not offered | FR-RTE-10, D-108 |
+| AT-US22-04 | Normal | A pickup was accepted | The vendor opens the listing | It shows which charity collects it and when, not the code | D-110 |
+| AT-US22-05 | Error | The charity opens the offer | It chooses a time before the start or after the end | The time is refused and the allowed times are shown | E-RTE-03 |
+| AT-US22-06 | Error | Charity A accepted the Donation | Charity B tries to accept it | B is told another charity accepted it; it is gone from B's offers | E-RTE-04 |
+| AT-US22-07 | Alternative | A pickup is Scheduled | The charity taps Cancel pickup | It shows Cancelled, the code disappears and other charities see the offer again | FR-RTE-10 (Partner cancels) |
+| AT-US22-08 | Normal | The pickup time has come | The vendor types the charity's code and confirms | The pickup is Collected for the charity and the listing is closed | FR-RES-10, D-110 |
+| AT-US22-09 | Normal | The app is in Arabic | The charity uses Offers and My pickups | All texts are Arabic and the layout is right-to-left | NFR-06 |
+
+## US-24 Compost offers (Sprint 3, D-111)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US24-01 | Normal | A vendor publishes a listing with destination Composting; an Approved composting partner accepts its food type | The partner opens Offers | The Compost offer is listed, marked Compost offer | FR-RTE-12 |
+| AT-US24-02 | Normal | The composting partner opens it | It chooses a time in the window and accepts | It gets a pickup code; the vendor completes the pickup with it | FR-RTE-12, FR-RES-10 |
+| AT-US24-03 | Error | A charity and an "other" partner | They open their homes | The charity does not see the Compost offer; the other partner has no offers | FR-RTE-12, D-111 |
+
+## US-23 Automatic charity offers (Sprint 3, D-112)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US23-01 | Normal | A vendor | They turn on "Offer unreserved bags to charities" on the home | The switch stays on after reopening the app | FR-RTE-11 |
+| AT-US23-02 | Normal | Opted in; a consumer listing with unreserved bags; a charity accepts the food | The BR-10 time before the pickup end comes (60 min) | The charity sees a Donation with those bags; the vendor's listing says they were offered | FR-RTE-11, BR-10 |
+| AT-US23-03 | Normal | Not opted in, or no unreserved bags, or no charity accepts the food | The time comes | Nothing is offered; the bags stay for consumers | FR-RTE-11, D-112 |
+| AT-US23-04 | Normal | The automatic Donation is offered | A charity accepts and the vendor enters its code | The pickup is completed as in US-22 | FR-RTE-11, FR-RTE-10 |
+
+## US-43 Zakat donation and receipt (Sprint 3, D-113 to D-116)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US43-01 | Normal | A consumer opens an offer; a charity accepts its food type | They tap Donate as Zakat, choose 2 bags and the charity, and pay with card 40000000 | The receipt opens: number ZK-…, vendor, food, 2 bags, amount, charity, date, Paid | FR-TGI-05, FR-TGI-06 |
+| AT-US43-02 | Error | No charity accepts the food | The consumer opens Donate as Zakat | They are told no charity can take it and cannot pay | FR-TGI-05 |
+| AT-US43-03 | Normal | A Paid Zakat donation | The charity accepts the Donation and the vendor enters its code | The receipt shows Delivered with the time | FR-TGI-06 |
+| AT-US43-04 | Normal | A receipt is open | The consumer taps Share as PDF | A PDF of the receipt (right to left in Arabic) opens in the share sheet | FR-TGI-06, NFR-06 |
+| AT-US43-05 | Error | The consumer pays with the blocked card 40000002 | They pay | The reason is shown; no receipt; the bags are still on offer | E-TGI-02 |
+| AT-US43-06 | Error | A Paid donation the charity does not collect | The pickup window ends | The card gets the full amount back; the receipt shows Refunded | E-TGI-03, BR-11 |
+
 ## US-27 Card reservation (Sprint 2, D-99; test cards in docs/test-cards.md)
 
 | ID | Type | Given | When | Then | Requirements |

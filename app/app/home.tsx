@@ -1,5 +1,7 @@
 // Home screen after login (US-04), one per role group: consumer, vendor, partner (charity, composting, other) and
-// administrator. The consumer home is the map of nearby offers (US-26, D-65); the partner home is a placeholder.
+// administrator. The consumer home is the map of nearby offers (US-26, D-65); a charity partner gets its Donation
+// offers and pickups (US-22, D-108) and a composting partner its Compost offers (US-24, D-111); "other" partners
+// still see a placeholder.
 // E-ACC-05: a Pending or Rejected vendor or partner sees the application status and no food functions.
 // E-ACC-06: a Suspended account sees that it is suspended. The administrator home lists Pending applications (US-07).
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -12,6 +14,7 @@ import { Button } from '@/components/Button';
 import { ApplicationsList } from '@/components/ApplicationsList';
 import { ConsumerHome } from '@/components/ConsumerHome';
 import { Notice } from '@/components/Notice';
+import { PartnerHome } from '@/components/PartnerHome';
 import { RejectedApplication } from '@/components/RejectedApplication';
 import { HomeHeader } from '@/components/HomeHeader';
 import { Screen } from '@/components/Screen';
@@ -116,7 +119,13 @@ export default function HomeScreen() {
   return (
     <Screen scroll edges={EDGES} header={<HomeHeader />}>
       <View testID={`home-${group}`} style={box}>
-        {group === 'vendor' ? <VendorHome /> : <AppText>{t(`home.${group}`)}</AppText>}
+        {group === 'vendor' ? (
+          <VendorHome />
+        ) : user.role === 'charity' || user.role === 'composting' ? (
+          <PartnerHome />
+        ) : (
+          <AppText>{t(`home.${group}`)}</AppText>
+        )}
       </View>
     </Screen>
   );

@@ -119,6 +119,8 @@ describe('NFR-12 the payment gateway is down', () => {
   beforeEach(() => {
     setPaymentGateway({
       charge: () => Promise.reject(new Error('gateway unreachable')),
+      // US-43 added refunds to IPaymentGateway; a gateway that is down cannot refund either.
+      refund: () => Promise.reject(new Error('gateway unreachable')),
     });
   });
 

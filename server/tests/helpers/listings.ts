@@ -77,6 +77,35 @@ export async function createPartner(
   return id;
 }
 
+/** A partner as createPartner makes it, with the email and a login token (US-22 charity pickup tests). */
+export async function createPartnerAccount(
+  app: Express,
+  role: 'charity' | 'composting' | 'other',
+  options: { status?: string; acceptedFoodTypes?: string[]; latitude?: number; longitude?: number } = {},
+): Promise<{ id: string; email: string; token: string }> {
+  const email = uniqueEmail(role);
+  const response = await request(app)
+    .post('/auth/register')
+    .send({
+      email,
+      password: PASSWORD,
+      language: 'en',
+      role,
+      partnerProfile: {
+        organisationName: role === 'composting' ? 'Green Compost' : 'Giza Food Bank',
+        address: '5 Nile Corniche, Giza',
+        latitude: options.latitude ?? 30.0131,
+        longitude: options.longitude ?? 31.2089,
+        acceptedFoodTypes: options.acceptedFoodTypes ?? ['cooked_meals'],
+        ...(role === 'other' ? { otherPartnerType: 'Animal shelter' } : {}),
+      },
+    });
+  if (response.status !== 201) throw new Error(`partner register failed: ${JSON.stringify(response.body)}`);
+  const id = (response.body as { id: string }).id;
+  await setUserStatus(id, options.status ?? 'Approved');
+  return { id, email, token: await tokenFor(app, email) };
+}
+
 export async function photoKeyFor(app: Express, token: string): Promise<string> {
   const response = await request(app)
     .post('/listings/photo')

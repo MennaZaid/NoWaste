@@ -9,6 +9,12 @@ import { renderApp } from './helpers/renderApp';
 import { headerDirections, headerSlotContents } from './helpers/headerDirection';
 
 jest.mock('@/api/client', () => ({
+  getAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: false }),
+  setAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: true }),
+  getListingAutoOffer: jest.fn().mockResolvedValue({ kind: 'ok', offer: null }),
+  getListingPartnerPickup: jest.fn().mockResolvedValue({ kind: 'ok', pickup: null }),
+  getPartnerOffers: jest.fn().mockResolvedValue({ kind: 'ok', offers: [] }),
+  getPartnerPickups: jest.fn().mockResolvedValue({ kind: 'ok', pickups: [] }),
   // The vendor home asks for the shop (US-10); these tests only check which home opens.
   getShop: jest.fn().mockResolvedValue({ kind: 'unexpected' }),
   isServerHealthy: jest.fn().mockResolvedValue(true),

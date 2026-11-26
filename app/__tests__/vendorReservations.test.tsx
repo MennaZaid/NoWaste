@@ -296,6 +296,40 @@ describe('FR-RES-10 E-RES-03 the vendor types the pickup code', () => {
     });
   });
 
+  test('NFR-06 D-110 the hand-over message follows a language switch (a charity code)', async () => {
+    const charity = {
+      id: 'p1',
+      listingId: 'l1',
+      organisationName: 'Giza Food Bank',
+      status: 'Completed' as const,
+      listingType: 'Donation' as const,
+      pickupTime: '2026-11-01T11:00:00.000Z',
+      pickupCode: null,
+      shopName: 'Fatma Bakery',
+      address: '12 Tahrir Street',
+      nameAr: null,
+      nameEn: 'Koshari',
+      sourceLanguage: 'en' as const,
+      foodCategory: 'cooked_meals',
+      bags: 3,
+      pickupStart: '2026-11-01T10:10:00.000Z',
+      pickupEnd: '2026-11-01T12:10:00.000Z',
+      latitude: 30.04,
+      longitude: 31.21,
+    };
+    mocked.verify.mockResolvedValue({ kind: 'partner', pickup: { ...charity, status: 'Accepted' } });
+    mocked.complete.mockResolvedValue({ kind: 'partner', pickup: charity });
+    await openReservations();
+    await typeCode('123456');
+    await fireEvent.press(await screen.findByTestId('vendor-code-handover'));
+    expect(await screen.findByText('Handed over to Giza Food Bank.')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'العربية' }));
+
+    expect(await screen.findByText('استلمت Giza Food Bank التبرع.')).toBeOnTheScreen();
+    expect(screen.queryByText('Handed over to Giza Food Bank.')).toBeNull();
+  });
+
   test('FR-RES-10 Cancel closes the confirmation without handing over', async () => {
     mocked.verify.mockResolvedValue({
       kind: 'ok',

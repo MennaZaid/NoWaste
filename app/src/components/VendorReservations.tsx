@@ -30,7 +30,13 @@ const REFRESH_MS = 60_000;
 type Found =
   | { kind: 'reservation'; id: string; number: number; method: 'card' | 'no-card' }
   | { kind: 'partner'; name: string; pickupTime: string };
-type Message = { tone: 'info' | 'error'; text: string };
+// The text key and its values, translated when shown, so the message follows a language switch (NFR-06).
+type Message = {
+  tone: 'info' | 'error';
+  key: string;
+  values?: Record<string, string | number>;
+  startsAt?: string;
+};
 
 function isToCollect(row: VendorReservationRow): boolean {
   return row.status === 'Held' || row.status === 'Confirmed';
@@ -107,7 +113,7 @@ export function VendorReservations({
       }
       setFound(null);
       setCode('');
-      setMessage({ tone: 'info', text: t('partnerOffers.charityHandedOver', { name: charity.name }) });
+      setMessage({ tone: 'info', key: 'partnerOffers.charityHandedOver', values: { name: charity.name } });
       reload();
       return;
     }
@@ -120,7 +126,8 @@ export function VendorReservations({
       setCode('');
       setMessage({
         tone: 'info',
-        text: t('vendorReservations.handedOver', { number: result.reservation.number }),
+        key: 'vendorReservations.handedOver',
+        values: { number: result.reservation.number },
       });
       reload();
       return;
@@ -129,12 +136,11 @@ export function VendorReservations({
     if (result.kind === 'refused') {
       setMessage({
         tone: 'error',
-        text: t(`vendorReservations.refused.${result.reason}`, {
-          time: result.startsAt === undefined ? '' : formatTime(result.startsAt, language),
-        }),
+        key: `vendorReservations.refused.${result.reason}`,
+        ...(result.startsAt === undefined ? {} : { startsAt: result.startsAt }),
       });
     } else if (result.kind === 'unauthorized' || result.kind === 'suspended') void signOut();
-    else setMessage({ tone: 'error', text: t('vendorReservations.failed') });
+    else setMessage({ tone: 'error', key: 'vendorReservations.failed' });
   }
 
   function timeOf(row: VendorReservationRow): string | null {
@@ -227,7 +233,14 @@ export function VendorReservations({
         </View>
       )}
       {message !== null ? (
-        <Notice testID="vendor-code-message" tone={message.tone} message={message.text} />
+        <Notice
+          testID="vendor-code-message"
+          tone={message.tone}
+          message={t(message.key, {
+            ...message.values,
+            time: message.startsAt === undefined ? '' : formatTime(message.startsAt, language),
+          })}
+        />
       ) : null}
 
       {failed ? <Notice tone="error" message={t('vendorReservations.failed')} /> : null}

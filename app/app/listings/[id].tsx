@@ -12,6 +12,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { AutoOfferNote } from '@/components/AutoOfferNote';
 import { DonationPickup } from '@/components/DonationPickup';
+import { LandfillSection, showsLandfill } from '@/components/LandfillSection';
 import { VendorReservations } from '@/components/VendorReservations';
 import { Button } from '@/components/Button';
 import { ListingPhoto } from '@/components/ListingPhoto';
@@ -38,9 +39,9 @@ type Problem =
   | 'startPassed'
   | 'startTooFar';
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, testID }: { label: string; value: string; testID?: string }) {
   return (
-    <View style={styles.row}>
+    <View testID={testID} style={styles.row}>
       <AppText variant="caption" color="textMuted">
         {label}
       </AppText>
@@ -59,6 +60,8 @@ export default function ListingScreen() {
   const [problem, setProblem] = useState<Problem | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [justPublished, setJustPublished] = useState(false);
+  // US-25: the time the page opened, to tell whether the pickup has ended (as My listings does, D-102).
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     if (token === null) return;
@@ -150,6 +153,14 @@ export default function ListingScreen() {
               />
             ) : null}
             <Row label={t('listing.priceLabel')} value={t('listing.egp', { amount: listing.price })} />
+            {/* US-16 (FR-LST-07, IF-UI-04): the kept calorie estimate, labelled Estimate. */}
+            {listing.calorieMin != null && listing.calorieMax != null ? (
+              <Row
+                testID="listing-calories"
+                label={t('calories.label')}
+                value={t('calories.estimate', { min: listing.calorieMin, max: listing.calorieMax })}
+              />
+            ) : null}
             <Row label={t('listing.pickupStartLabel')} value={time(listing.pickupStart)} />
             <Row
               label={listing.isQuickPost ? t('listing.pickupEndLabel') : t('listing.pickByLabel')}
@@ -195,6 +206,10 @@ export default function ListingScreen() {
                 listingId={listing.id}
                 ended={listing.status === 'Closed'}
               />
+            ) : null}
+            {/* US-25 (FR-RTE-13, D-117): after the pickup window, the bags nobody took as landfill. */}
+            {showsLandfill(listing, now) ? (
+              <LandfillSection token={session} listing={listing} onSessionEnded={sessionEnded} />
             ) : null}
             {listing.status === 'Draft' ? (
               <>

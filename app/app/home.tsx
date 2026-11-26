@@ -17,6 +17,7 @@ import { Notice } from '@/components/Notice';
 import { PartnerHome } from '@/components/PartnerHome';
 import { RejectedApplication } from '@/components/RejectedApplication';
 import { HomeHeader } from '@/components/HomeHeader';
+import { ImpactButton } from '@/components/ImpactButton';
 import { Screen } from '@/components/Screen';
 import { VendorHome } from '@/components/VendorHome';
 import { useLanguage } from '@/i18n/LanguageProvider';
@@ -100,6 +101,8 @@ export default function HomeScreen() {
               router.push('/admin/ramadan');
             }}
           />
+          {/* US-44 (FR-TGI-07): the platform-wide impact numbers. */}
+          <ImpactButton />
         </View>
       </Screen>
     );
@@ -126,6 +129,8 @@ export default function HomeScreen() {
         ) : (
           <AppText>{t(`home.${group}`)}</AppText>
         )}
+        {/* US-44 (FR-TGI-07): the vendor's and partner's impact numbers. */}
+        <ImpactButton />
       </View>
     </Screen>
   );

@@ -368,3 +368,12 @@ on full listings, NFR-05c with an expiry), the moved pickup pin (FR-LST-01) and 
 | E-TGI-02 | US-43 | Server: declined card: 402 E-TGI-02 with the reason, bags stay, no receipt, no Donation. App: the reason is shown | AT-US43-05 | Built |
 | E-TGI-03, BR-11 | US-43 | Server: refunded in full after the window ends; nothing before; delivered not refunded; refund once | AT-US43-06 | Built (worker job) |
 | NFR-05a, NFR-06 | US-23, US-43 | App: no Zakat text says the food is safe; Arabic labels and right-to-left PDF | – | Built |
+
+## Sprint 3: US-44, US-25, US-16 (Farah, 2026-11-26, D-117 to D-119)
+
+| Requirement | Story | Tests | Acceptance tests | Status |
+| ----------- | ----- | ----- | ---------------- | ------ |
+| FR-TGI-07 | US-44 | server/tests/impact.test.ts: settings row 2.5 kg; all zero at first; platform numbers the same for every role; consumer, vendor, charity, composting partner and administrator own numbers; Confirmed reservations, Accepted offers, Paid and Refunded Zakat not counted; CO2 follows the setting; Quick Posts add no money saved; 401 without login. App: app/\_\_tests\_\_/impact.test.tsx platform and own numbers, admin only platform, failed load, Arabic digits right-to-left, opened from the profile menu | Not written | Built |
+| NFR-05a | US-44, US-16 | App: CO2 avoided and the calorie range are labelled Estimate; no impact, landfill or calorie text says the food is safe | – | Built |
+| FR-RTE-13 | US-25 | server/tests/landfill.test.ts: bags left recorded once after the window; collected bags not counted; listing page shows the record; before the end, second time, nothing left, partner took it, Draft, other vendor's listing and not Approved vendor (E-LST-06) refused. App: app/\_\_tests\_\_/landfill.test.tsx offered after the window with the bags left, recorded, refusal explained, already recorded, not offered before the end | Not written | Built |
+| FR-LST-07, IF-UI-04 | US-16 | server/tests/calorieEstimate.test.ts: draft carries kcal per bag; none when the AI gives none; invalid ranges dropped; mock gives one; kept estimate stored; removed or missing not stored; keep without a range 400 E-LST-04; non-boolean refused; Quick Post; offers list and product page carry it; Groq prompt asks for it, answer parsed, malformed gives null. App: app/\_\_tests\_\_/calorieEstimate.test.tsx Estimate with Remove, kept and removed sent, none without a range, Quick Post, vendor listing page and customer product page | Not written | Built |

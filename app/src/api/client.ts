@@ -464,6 +464,17 @@ export interface Listing {
   longitude: number;
   /** FR-RES-09 (D-101, D-102): the bag counts; on My listings and the listing page. */
   reservations?: BagCounts;
+  /** US-16 (FR-LST-07): the estimated kcal per bag, kept from the AI draft; null when none. */
+  calorieMin?: number | null;
+  calorieMax?: number | null;
+  /** US-25 (D-117): the landfill record; on the listing page only. */
+  landfill?: LandfillRecord | null;
+}
+
+/** US-25 (FR-RTE-13, D-117): the bags nobody took, recorded after the pickup window. */
+export interface LandfillRecord {
+  bags: number;
+  recordedAt: string;
 }
 
 /** US-18: most urgent first. */
@@ -509,6 +520,8 @@ export interface AiDraft {
   foodCategory: ListingFoodCategory;
   /** D-82: shown only as an Estimate; it does not fill the number of bags. */
   quantity: number | null;
+  /** US-16 (FR-LST-07, D-119): estimated kcal per bag, shown only as an Estimate the vendor keeps or removes. */
+  calorieRange?: { min: number; max: number } | null;
   nameAr: string;
   nameEn: string;
   descriptionAr: string;
@@ -576,6 +589,8 @@ export type ListingRequest = {
   secondName?: string;
   secondDescription?: string;
   confirmedAiFields?: AiField[];
+  /** US-16 (D-119): keep the AI calorie estimate; missing or false = removed. */
+  keepCalorieEstimate?: boolean;
 };
 
 export type QuickPostRequest = {
@@ -594,6 +609,8 @@ export type QuickPostRequest = {
   secondName?: string;
   secondDescription?: string;
   confirmedAiFields?: AiField[];
+  /** US-16 (D-119): keep the AI calorie estimate; missing or false = removed. */
+  keepCalorieEstimate?: boolean;
 };
 
 export type SaveListingResult = ListingAnswer<
@@ -956,6 +973,9 @@ export interface Offer {
   bagsAvailable: number;
   originalValue: number | null;
   price: number;
+  /** US-16 (FR-LST-07, IF-UI-04): the estimated kcal per bag, always shown labelled Estimate; null when none. */
+  calorieMin?: number | null;
+  calorieMax?: number | null;
   pickupStart: string;
   pickupEnd: string;
   // D-73: customers are not shown the perishability category; the pickup window says when to come.
@@ -1657,4 +1677,62 @@ export async function getZakatReceipt(
   return result.status === 200 && result.data !== null
     ? { kind: 'ok', receipt: result.data as unknown as ZakatReceipt }
     : { kind: 'unexpected' };
+}
+
+/** US-44 (FR-TGI-07, D-118): one set of impact numbers. CO2 avoided is an estimate (NFR-05a). */
+export interface Impact {
+  mealsRescued: number;
+  moneySaved: number;
+  co2AvoidedKg: number;
+  bagsComposted: number;
+  bagsLandfill: number;
+}
+
+export interface ImpactView {
+  platform: Impact;
+  mine: Impact;
+  co2KgPerBag: number;
+}
+
+function isImpact(value: unknown): value is Impact {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return ['mealsRescued', 'moneySaved', 'co2AvoidedKg', 'bagsComposted', 'bagsLandfill'].every(
+    (key) => typeof v[key] === 'number',
+  );
+}
+
+/** GET /impact: platform-wide and the user's own impact numbers (every logged-in user). */
+export async function getImpact(token: string): Promise<Protected<{ kind: 'ok'; impact: ImpactView }>> {
+  const result = await protectedCall('/impact', {}, token);
+  if (result.kind !== 'response') return result;
+  const data = result.data;
+  return result.status === 200 && data !== null && isImpact(data.platform) && isImpact(data.mine)
+    ? { kind: 'ok', impact: data as unknown as ImpactView }
+    : { kind: 'unexpected' };
+}
+
+/**
+ * POST /listings/:id/landfill (US-25, FR-RTE-13, D-117): records the bags nobody took after the pickup window.
+ * `refused` carries the reason: pickup_not_ended, landfill_already_recorded, taken_by_partner, nothing_left or
+ * listing_not_published.
+ */
+export async function recordLandfill(
+  token: string,
+  id: string,
+): Promise<ListingAnswer<{ kind: 'ok'; record: LandfillRecord } | { kind: 'refused'; reason: string }>> {
+  const result = await protectedCall(
+    `/listings/${encodeURIComponent(id)}/landfill`,
+    { method: 'POST' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (notApproved(result)) return { kind: 'notApproved' };
+  const data = result.data;
+  if (result.status === 201 && data !== null && typeof data.bags === 'number') {
+    return { kind: 'ok', record: data as unknown as LandfillRecord };
+  }
+  if (result.status === 409 && typeof data?.error === 'string')
+    return { kind: 'refused', reason: data.error };
+  return { kind: 'unexpected' };
 }

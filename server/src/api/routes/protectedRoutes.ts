@@ -22,6 +22,7 @@ import {
 import { categoryHoursHandler } from './perishability.js';
 import { donateZakatHandler, myZakatHandler, zakatCharitiesHandler, zakatReceiptHandler } from './zakat.js';
 import { getRamadanHandler, setRamadanHandler } from './ramadan.js';
+import { getImpactHandler, recordLandfillHandler } from './impact.js';
 import {
   addBranchHandler,
   chooseDestinationHandler,
@@ -99,6 +100,8 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   // US-45 (FR-TGI-08, D-107): consumers read the Ramadan times; the administrator sets them.
   { method: 'get', path: '/ramadan', roles: ['consumer', 'admin'], handler: getRamadanHandler },
   { method: 'patch', path: '/admin/ramadan', roles: ['admin'], handler: setRamadanHandler },
+  // US-44 (FR-TGI-07, D-118): every user sees the impact numbers.
+  { method: 'get', path: '/impact', roles: EVERYONE, handler: getImpactHandler },
   { method: 'get', path: '/admin/applications', roles: ['admin'], handler: listApplicationsHandler },
   {
     method: 'post',
@@ -157,6 +160,8 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   },
   { method: 'post', path: '/listings/:id/unfit', ...APPROVED_VENDOR, handler: markUnfitHandler },
   { method: 'post', path: '/listings/:id/publish', ...APPROVED_VENDOR, handler: publishListingHandler },
+  // US-25 (FR-RTE-13, D-117): after the pickup window, the vendor records the bags nobody took as landfill.
+  { method: 'post', path: '/listings/:id/landfill', ...APPROVED_VENDOR, handler: recordLandfillHandler },
   // US-32, US-33 (D-101): the vendor's reservations of a listing and the pickup code at the counter.
   {
     method: 'get',

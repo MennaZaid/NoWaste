@@ -9,7 +9,7 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { colors, minTouchSize, radius, spacing } from '@/theme';
 import { AppText } from './AppText';
 
-type Item = { key: 'active' | 'past' | 'zakat' | 'edit'; go: () => void };
+type Item = { key: 'active' | 'past' | 'zakat' | 'impact' | 'edit'; go: () => void };
 
 export function ProfileMenu() {
   const { t } = useTranslation();
@@ -28,6 +28,8 @@ export function ProfileMenu() {
     { key: 'past', go: () => router.push('/reservations?scope=past' as Href) },
     // US-43 (FR-TGI-06): the consumer's Zakat receipts.
     { key: 'zakat', go: () => router.push('/zakat' as Href) },
+    // US-44 (FR-TGI-07): the impact numbers.
+    { key: 'impact', go: () => router.push('/impact' as Href) },
     { key: 'edit', go: () => router.push('/profile') },
   ];
 

@@ -69,6 +69,8 @@ export const createListingHandler: RequestHandler = async (req, res) => {
     secondName: b.secondName,
     secondDescription: b.secondDescription,
     confirmedAiFields: b.confirmedAiFields,
+    // US-16 (D-119): keep the AI calorie estimate (true) or not.
+    keepCalorieEstimate: b.keepCalorieEstimate,
   });
   res.status(201).json(listing);
 };
@@ -99,6 +101,7 @@ export const createQuickPostHandler: RequestHandler = async (req, res) => {
     secondName,
     secondDescription,
     confirmedAiFields,
+    keepCalorieEstimate,
   } = bodyOf(req.body);
   res.status(201).json(
     await createQuickPost(authOf(res).user.id, {
@@ -117,6 +120,8 @@ export const createQuickPostHandler: RequestHandler = async (req, res) => {
       secondName,
       secondDescription,
       confirmedAiFields,
+      // US-16 (D-119): keep the AI calorie estimate (true) or not.
+      keepCalorieEstimate,
     }),
   );
 };

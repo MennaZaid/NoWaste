@@ -20,6 +20,7 @@ import {
 import { createQuickPost, getShop, type AiDraft, type AiField, type QuickPostRequest } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { AiMark } from '@/components/AiMark';
+import { CalorieEstimate } from '@/components/CalorieEstimate';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { CounterField } from '@/components/CounterField';
@@ -76,6 +77,8 @@ export default function QuickPostScreen() {
   const [drafting, setDrafting] = useState(false);
   const [draft, setDraft] = useState<AiDraft | null>(null);
   const [noDraft, setNoDraft] = useState(false);
+  // US-16 (FR-LST-07, D-119): whether the AI calorie estimate is kept (the vendor may remove it).
+  const [keepCalories, setKeepCalories] = useState(true);
   const [secondName, setSecondName] = useState('');
   const [secondDescription, setSecondDescription] = useState('');
   const [aiFields, setAiFields] = useState<AiField[]>([]);
@@ -153,6 +156,7 @@ export default function QuickPostScreen() {
     const filled: AiField[] = ['name', 'description', 'secondName', 'secondDescription'];
     setAiFields(known ? [...filled, 'foodCategory'] : filled);
     setConfirmed([]);
+    setKeepCalories(true);
     setDraft(next);
   }
 
@@ -194,6 +198,8 @@ export default function QuickPostScreen() {
             ...(secondName.trim() === '' ? {} : { secondName }),
             ...(secondDescription.trim() === '' ? {} : { secondDescription }),
             confirmedAiFields: confirmed,
+            // US-16 (D-119): only when the draft has a calorie estimate.
+            ...(draft.calorieRange != null ? { keepCalorieEstimate: keepCalories } : {}),
           };
     return {
       ...ai,
@@ -325,6 +331,9 @@ export default function QuickPostScreen() {
               </AppText>
             ) : null}
           </Notice>
+        ) : null}
+        {draft?.calorieRange != null ? (
+          <CalorieEstimate range={draft.calorieRange} kept={keepCalories} onChange={setKeepCalories} />
         ) : null}
         {noDraft ? <Notice testID="ai-unavailable" tone="info" message={t('aiDraft.unavailable')} /> : null}
 

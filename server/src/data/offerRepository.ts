@@ -18,6 +18,9 @@ export interface OfferRecord {
   bagsAvailable: number;
   originalValue: number | null;
   price: number;
+  /** US-16 (FR-LST-07): the estimated kcal per bag, or null. */
+  calorieMin: number | null;
+  calorieMax: number | null;
   pickupStart: Date;
   pickupEnd: Date;
   perishabilityCategory: string | null;
@@ -37,6 +40,7 @@ const OFFER_COLUMNS = `l.id, l.vendor_id AS "vendorId", l.photo_key AS "photoKey
   l.description_ar AS "descriptionAr", l.description_en AS "descriptionEn", l.source_language AS "sourceLanguage",
   l.is_quick_post AS "isQuickPost", l.bags_available AS "bagsAvailable",
   l.original_value::float8 AS "originalValue", l.price::float8 AS price,
+  l.calorie_min AS "calorieMin", l.calorie_max AS "calorieMax",
   l.pickup_start AS "pickupStart", l.pickup_end AS "pickupEnd", l.perishability_category AS "perishabilityCategory",
   b.id AS "branchId", v.shop_name AS "shopName", COALESCE(b.name, v.shop_name) AS "branchName",
   COALESCE(b.address, v.address) AS address,

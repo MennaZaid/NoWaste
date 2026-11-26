@@ -12,6 +12,8 @@ export interface AiDraft {
   foodType: string;
   foodCategory: FoodCategory | 'unknown';
   quantity: number | null;
+  /** US-16 (FR-LST-07, D-119): estimated kcal per bag, or null. Kept only when the vendor keeps it. */
+  calorieRange: { min: number; max: number } | null;
   nameAr: string;
   nameEn: string;
   descriptionAr: string;
@@ -31,6 +33,18 @@ async function settingNumber(key: string, name: string): Promise<number> {
 
 const text = (value: unknown, max: number): value is string =>
   typeof value === 'string' && value.trim().length > 0 && Array.from(value.trim()).length <= max;
+
+/** D-119: a calorie range is whole positive numbers with min ≤ max; anything else is dropped ("when possible"). */
+function validRange(range: unknown): AiDraft['calorieRange'] {
+  if (typeof range !== 'object' || range === null) return null;
+  const { min, max } = range as { min?: unknown; max?: unknown };
+  return Number.isInteger(min) &&
+    Number.isInteger(max) &&
+    (min as number) > 0 &&
+    (min as number) <= (max as number)
+    ? { min: min as number, max: max as number }
+    : null;
+}
 
 /** Only a complete, well-formed answer is a draft; anything else is treated like a failed call (E-LST-01). */
 function toDraft(result: VisionResult): AiDraft | null {
@@ -52,6 +66,7 @@ function toDraft(result: VisionResult): AiDraft | null {
     foodType: result.foodType.trim(),
     foodCategory: result.foodCategory,
     quantity,
+    calorieRange: validRange(result.calorieRange),
     nameAr: result.nameAr.trim(),
     nameEn: result.nameEn.trim(),
     descriptionAr: result.descriptionAr.trim(),
@@ -139,4 +154,21 @@ export async function isAiConfident(
   if (draft === undefined || draft.foodCategory === 'unknown' || draft.foodCategory !== foodCategory)
     return true;
   return draft.confidence >= (await settingNumber('AI-CONFIDENCE', 'min_confidence'));
+}
+
+/**
+ * US-16 (FR-LST-07, D-119): the calorie range to store. `keepCalorieEstimate` true keeps the draft's range; false or
+ * missing means the vendor removed it (or never had one). Keeping a range the draft does not have is refused.
+ */
+export function calorieRangeToKeep(
+  draft: AiDraft | undefined,
+  keepCalorieEstimate: unknown,
+): { calorieMin: number | null; calorieMax: number | null } {
+  if (keepCalorieEstimate !== undefined && typeof keepCalorieEstimate !== 'boolean') {
+    throw new SrsError(400, { error: 'E-LST-04', fields: ['keepCalorieEstimate'] });
+  }
+  if (keepCalorieEstimate !== true) return { calorieMin: null, calorieMax: null };
+  const range = draft?.calorieRange ?? null;
+  if (range === null) throw new SrsError(400, { error: 'E-LST-04', fields: ['keepCalorieEstimate'] });
+  return { calorieMin: range.min, calorieMax: range.max };
 }

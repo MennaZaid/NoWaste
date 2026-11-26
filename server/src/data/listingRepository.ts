@@ -43,16 +43,12 @@ export interface ListingRecord {
 
 export type NewListing = Omit<
   ListingRecord,
-  | 'id'
-  | 'status'
-  | 'bagsAvailable'
-  | 'calorieMin'
-  | 'calorieMax'
-  | 'unfitForPeople'
-  | 'latitude'
-  | 'longitude'
+  'id' | 'status' | 'bagsAvailable' | 'unfitForPeople' | 'latitude' | 'longitude'
 > & {
   status: 'Draft' | 'Active';
+  /** US-16 (D-119): set only from an AI draft the vendor kept; omitted = none. */
+  calorieMin?: number | null;
+  calorieMax?: number | null;
   /** null = the vendor's shop pin; otherwise the branch pin (D-64). */
   location: { latitude: number; longitude: number } | null;
 };
@@ -76,11 +72,12 @@ export async function insertListing(listing: NewListing): Promise<ListingRecord>
   const result = await getPool().query<ListingRecord>(
     `INSERT INTO listings (vendor_id, listing_type, status, is_quick_post, food_type, food_category, photo_key,
        description_ar, description_en, bags_total, bags_available, original_value, price, pickup_start, pickup_end,
-       prep_time, storage, expiry_at, perishability_category, location, name_ar, name_en, source_language, branch_id)
+       prep_time, storage, expiry_at, perishability_category, location, name_ar, name_en, source_language, branch_id,
+       calorie_min, calorie_max)
      SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11, $12, $13, $14, $15, $16, $17, $18,
        CASE WHEN $19::float8 IS NULL THEN v.location
             ELSE ST_SetSRID(ST_MakePoint($20, $19), 4326)::geography END,
-       $21, $22, $23, $24
+       $21, $22, $23, $24, $25, $26
      FROM vendor_profiles v WHERE v.user_id = $1
      RETURNING ${columns}`,
     [
@@ -108,6 +105,8 @@ export async function insertListing(listing: NewListing): Promise<ListingRecord>
       listing.nameEn,
       listing.sourceLanguage,
       listing.branchId,
+      listing.calorieMin ?? null,
+      listing.calorieMax ?? null,
     ],
   );
   const row = result.rows[0];

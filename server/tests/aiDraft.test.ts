@@ -92,6 +92,8 @@ describe('FR-LST-03 the AI drafts a listing from the photo', () => {
       foodType: 'Koshari',
       foodCategory: 'cooked_meals',
       quantity: 4,
+      // US-16 (D-119): this draft has no calorie estimate.
+      calorieRange: null,
       nameAr: 'كشري',
       nameEn: 'Koshari',
       descriptionAr: 'كشري طازج بالبصل المقرمش',

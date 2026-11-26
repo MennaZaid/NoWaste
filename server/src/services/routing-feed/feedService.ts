@@ -53,6 +53,9 @@ export interface OfferView {
   bagsAvailable: number;
   originalValue: number | null;
   price: number;
+  /** US-16 (FR-LST-07, IF-UI-04): the estimated kcal per bag, shown labelled Estimate; null when none. */
+  calorieMin: number | null;
+  calorieMax: number | null;
   pickupStart: string;
   pickupEnd: string;
   // D-73: no perishability category for customers; the pickup window says when to come.
@@ -83,6 +86,8 @@ function toView(offer: OfferRecord): OfferView {
     bagsAvailable: offer.bagsAvailable,
     originalValue: offer.originalValue,
     price: offer.price,
+    calorieMin: offer.calorieMin,
+    calorieMax: offer.calorieMax,
     pickupStart: offer.pickupStart.toISOString(),
     pickupEnd: offer.pickupEnd.toISOString(),
     distanceMeters: offer.distanceMeters === null ? null : Math.round(offer.distanceMeters),

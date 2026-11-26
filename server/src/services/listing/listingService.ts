@@ -22,10 +22,12 @@ import { clock } from '../../domain/clock.js';
 import { estimate, pickBy, type PerishabilityCategory } from '../../domain/perishability.js';
 import { NO_BAGS, countListingReservations, type BagCounts } from '../../data/reservationRepository.js';
 import { releaseExpiredHolds } from '../reservation/reservationService.js';
+import { findLandfillRecord } from '../../data/landfillRepository.js';
 import { getSetting } from '../../data/settingsRepository.js';
 import { openingPeriodFor } from '../../domain/openingHours.js';
 import { rulesFor } from '../perishability/thresholds.js';
 import {
+  calorieRangeToKeep,
   checkConfirmed,
   draftForPhoto,
   draftOf,
@@ -58,6 +60,8 @@ export interface ListingView {
   id: string;
   /** FR-RES-09 (D-101, D-102): taken, collected, waiting and not collected; on My listings and the listing page. */
   reservations?: BagCounts;
+  /** US-25 (D-117): the landfill record; on the listing page only. */
+  landfill?: { bags: number; recordedAt: string } | null;
   status: ListingRecord['status'];
   listingType: ListingRecord['listingType'];
   isQuickPost: boolean;
@@ -146,9 +150,7 @@ async function localTimeZone(): Promise<string> {
 /** D-104: the pickup start limits (settings row LISTING-START). */
 async function pickupStartRule(): Promise<PickupStartRule> {
   const value = (await getSetting('LISTING-START'))?.value as
-    | { max_days_ahead?: unknown; past_grace_minutes?: unknown }
-    | null
-    | undefined;
+    { max_days_ahead?: unknown; past_grace_minutes?: unknown } | null | undefined;
   if (typeof value?.max_days_ahead !== 'number' || typeof value.past_grace_minutes !== 'number') {
     throw new Error('Settings row LISTING-START is missing');
   }
@@ -416,7 +418,7 @@ export async function previewPickBy(
  */
 export async function createListing(
   vendorId: string,
-  input: ListingInput & { confirmedAiFields?: unknown },
+  input: ListingInput & { confirmedAiFields?: unknown; keepCalorieEstimate?: unknown },
 ): Promise<ListingView> {
   const check = validateListing(input);
   if (!check.ok) throw new SrsError(400, { error: 'E-LST-04', fields: check.fields });
@@ -427,6 +429,8 @@ export async function createListing(
   // US-12: NFR-05b every AI-filled field confirmed; NFR-05d an uncertain AI category is Highly perishable.
   const draft = await draftOf(listing.photoKey);
   checkConfirmed(draft, listing, confirmed);
+  // US-16 (FR-LST-07, D-119): the AI calorie estimate, unless the vendor removed it.
+  const calories = calorieRangeToKeep(draft, input.keepCalorieEstimate);
   const branch = await ownBranch(vendorId, listing.branchId);
   const pickupStart = new Date(listing.pickupStart);
   // D-104: checked when the Draft is saved and again when it is published.
@@ -467,6 +471,7 @@ export async function createListing(
     expiryAt: null,
     location: { latitude: branch.latitude, longitude: branch.longitude },
     branchId: branch.id,
+    ...calories,
   });
   return present(created);
 }
@@ -495,6 +500,7 @@ export async function createQuickPost(
     secondName?: unknown;
     secondDescription?: unknown;
     confirmedAiFields?: unknown;
+    keepCalorieEstimate?: unknown;
   },
 ): Promise<ListingView> {
   const check = validateQuickPost(input, clock.now());
@@ -510,7 +516,10 @@ export async function createQuickPost(
   if (typeof input.pickupStart === 'string') await checkPickupStart(new Date(input.pickupStart));
   await checkPhotoKey(post.photoKey);
   // D-86 NFR-05b: with an AI draft for this photo, every AI-filled field is confirmed or edited.
-  checkConfirmed(await draftOf(post.photoKey), post, confirmed);
+  const draft = await draftOf(post.photoKey);
+  checkConfirmed(draft, post, confirmed);
+  // US-16 (FR-LST-07, D-119): the AI calorie estimate, unless the vendor removed it.
+  const calories = calorieRangeToKeep(draft, input.keepCalorieEstimate);
   const [main] = await findVendorBranches(vendorId);
   if (main === undefined) throw new Error('No branch for this vendor');
   const pickupStart = new Date(post.pickupStart);
@@ -552,6 +561,7 @@ export async function createQuickPost(
     expiryAt: null,
     location: { latitude: main.latitude, longitude: main.longitude },
     branchId: main.id,
+    ...calories,
   });
   return present(created);
 }
@@ -569,7 +579,14 @@ export async function getListing(vendorId: string, id: string): Promise<ListingV
   await releaseExpiredHolds();
   const listing = await ownListing(vendorId, id);
   const counts = await countListingReservations([listing.id], clock.now());
-  return { ...(await present(listing)), reservations: counts.get(listing.id) ?? NO_BAGS };
+  // US-25 (D-117): the landfill record, once the vendor has made one.
+  const landfill = await findLandfillRecord(listing.id);
+  return {
+    ...(await present(listing)),
+    reservations: counts.get(listing.id) ?? NO_BAGS,
+    landfill:
+      landfill === undefined ? null : { bags: landfill.bags, recordedAt: landfill.recordedAt.toISOString() },
+  };
 }
 
 /**

@@ -14,6 +14,7 @@ Answer with one JSON object only, with these keys:
 foodType (short English name of the food),
 foodCategory (one of: ${FOOD_CATEGORIES.join(', ')}, or "unknown"),
 quantity (estimated number of portions as a whole number, or null),
+calorieRange (estimated calories of one bag of this food in kcal, as {"min": whole number, "max": whole number}, or null when you cannot estimate it),
 nameAr (name in Arabic, at most 80 characters), nameEn (name in English, at most 80 characters),
 descriptionAr (Arabic description, at most 300 characters), descriptionEn (English description, at most 300 characters),
 confidence (0 to 1, how sure you are of foodCategory).
@@ -23,6 +24,13 @@ interface GroqOptions {
   apiKey: string;
   model: string;
   fetchFn?: (url: string, init: RequestInit) => Promise<Response>;
+}
+
+/** FR-LST-07: the answer's calorie range when it has a min and a max; aiDraft.ts checks the numbers. */
+function rangeOf(value: unknown): VisionResult['calorieRange'] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const { min, max } = value as { min?: unknown; max?: unknown };
+  return typeof min === 'number' && typeof max === 'number' ? { min, max } : null;
 }
 
 export function createGroqVision({ apiKey, model, fetchFn = fetch }: GroqOptions): IVision {
@@ -58,7 +66,7 @@ export function createGroqVision({ apiKey, model, fetchFn = fetch }: GroqOptions
         foodType: answer.foodType as string,
         foodCategory: answer.foodCategory as VisionResult['foodCategory'],
         quantity: answer.quantity ?? null,
-        calorieRange: null,
+        calorieRange: rangeOf((answer as { calorieRange?: unknown }).calorieRange),
         nameAr: answer.nameAr as string,
         nameEn: answer.nameEn as string,
         descriptionAr: answer.descriptionAr as string,

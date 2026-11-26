@@ -17,7 +17,7 @@ export interface VisionResult {
   foodCategory: FoodCategory | 'unknown';
   /** Estimated quantity (portions); shown to the vendor as an Estimate only (D-82). null when not estimated. */
   quantity: number | null;
-  /** Estimated calorie range; not used before US-38. */
+  /** US-16 (FR-LST-07, D-119): estimated kcal per bag, shown only as an Estimate. null when not estimated. */
   calorieRange: { min: number; max: number } | null;
   nameAr: string;
   nameEn: string;
@@ -40,7 +40,7 @@ export function createMockVision(): IVision {
         foodType: 'Koshari',
         foodCategory: 'cooked_meals',
         quantity: 4,
-        calorieRange: null,
+        calorieRange: { min: 600, max: 900 },
         nameAr: 'كشري',
         nameEn: 'Koshari',
         descriptionAr: 'كشري بالعدس والأرز والمكرونة والبصل المقرمش',

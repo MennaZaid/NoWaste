@@ -183,6 +183,14 @@ export default function OfferScreen() {
               label={t('offers.bagsLabel')}
               value={localDigits(offer.bagsAvailable, language)}
             />
+            {/* US-16 (FR-LST-07, IF-UI-04): the calorie range, always labelled Estimate. */}
+            {offer.calorieMin != null && offer.calorieMax != null ? (
+              <Row
+                testID="offer-calories"
+                label={t('calories.label')}
+                value={t('calories.estimate', { min: offer.calorieMin, max: offer.calorieMax })}
+              />
+            ) : null}
 
             {standing?.level === 'warning' ? (
               <Notice

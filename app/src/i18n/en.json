@@ -575,7 +575,8 @@
     "currentRequired": "Enter your current password.",
     "failed": "Something went wrong. Check your connection and try again.",
     "logout": "Log out",
-    "zakat": "Zakat receipts"
+    "zakat": "Zakat receipts",
+    "impact": "Impact numbers"
   },
   "payment": {
     "title": "Pay by card",
@@ -767,5 +768,42 @@
     "share": "Share as PDF",
     "shareFailed": "Could not make the PDF. Try again.",
     "failed": "Could not load this. Check your connection and try again."
+  },
+  "calories": {
+    "label": "Calories",
+    "estimate": "Estimate: {{min}}–{{max}} kcal per bag",
+    "formNote": "AI estimate of the calories in one bag. Customers see it labelled Estimate. Remove it if you do not want it shown.",
+    "remove": "Remove estimate",
+    "keep": "Show estimate",
+    "removed": "The calorie estimate will not be shown to customers."
+  },
+  "landfill": {
+    "title": "Landfill",
+    "intro": "Pickup window over. Bags not taken: {{count}}. If nobody else can use the food, record it as sent to landfill so it counts in the impact numbers.",
+    "record": "Record landfill disposal",
+    "recording": "Recording…",
+    "recorded": "Recorded as sent to landfill. Bags: {{count}}.",
+    "errors": {
+      "pickup_not_ended": "The pickup has not ended yet.",
+      "landfill_already_recorded": "A landfill disposal is already recorded for this listing.",
+      "taken_by_partner": "A charity or composting partner took this food, so it is not landfill.",
+      "nothing_left": "Every bag was taken, so there is nothing to record.",
+      "listing_not_published": "Only a published listing can be recorded as landfill.",
+      "failed": "Could not record it. Check your connection and try again."
+    }
+  },
+  "impact": {
+    "open": "Impact numbers",
+    "title": "Impact numbers",
+    "platform": "Everyone on NoWaste",
+    "mine": "Your impact",
+    "meals": "Meals rescued",
+    "money": "Money saved",
+    "co2": "CO2 avoided",
+    "co2Value": "Estimate: {{kg}} kg",
+    "composted": "Bags composted",
+    "landfill": "Bags sent to landfill",
+    "co2Note": "CO2 avoided is an estimate: {{kg}} kg for each rescued bag.",
+    "loadFailed": "Could not load the impact numbers. Check your connection and try again."
   }
 }

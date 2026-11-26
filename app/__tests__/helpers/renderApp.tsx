@@ -18,6 +18,7 @@ import OfferScreen from '../../app/offers/[id]';
 import ReservationScreen from '../../app/reservations/[id]';
 import MyReservationsScreen from '../../app/reservations/index';
 import ProfileScreen from '../../app/profile';
+import ImpactScreen from '../../app/impact';
 import PayScreen from '../../app/pay/[id]';
 import PartnerOfferScreen from '../../app/partner/offers/[id]';
 import PartnerPickupScreen from '../../app/partner/pickups/[id]';
@@ -46,6 +47,7 @@ export function renderApp(initialUrl = '/') {
       'reservations/[id]': ReservationScreen,
       'reservations/index': MyReservationsScreen,
       profile: ProfileScreen,
+      impact: ImpactScreen,
       'pay/[id]': PayScreen,
       'partner/offers/[id]': PartnerOfferScreen,
       'partner/pickups/[id]': PartnerPickupScreen,

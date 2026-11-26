@@ -255,3 +255,84 @@ export async function insertPendingCardReservation(
   );
   return result.rows[0]?.id ?? '';
 }
+
+/**
+ * US-44 impact fixtures: a consumer collected one bag (a Completed reservation, one bag each, SDD 4.2) at `pricePaid`.
+ */
+export async function insertCompletedReservation(
+  listingId: string,
+  consumerId: string,
+  pricePaid: number,
+  status = 'Completed',
+): Promise<void> {
+  await getPool().query('UPDATE listings SET bags_available = bags_available - 1 WHERE id = $1', [listingId]);
+  await getPool().query(
+    `INSERT INTO reservations (listing_id, consumer_id, method, status, price_paid)
+     VALUES ($1, $2, 'card', $3, $4)`,
+    [listingId, consumerId, status, pricePaid],
+  );
+}
+
+/** US-44: the listing became a Donation or Compost offer and a partner took it (`status` Completed or Accepted). */
+export async function insertPartnerPickup(
+  listingId: string,
+  partnerId: string,
+  listingType: 'Donation' | 'Compost offer',
+  status: 'Accepted' | 'Completed' = 'Completed',
+): Promise<void> {
+  await getPool().query(`UPDATE listings SET listing_type = $2, status = 'Active' WHERE id = $1`, [
+    listingId,
+    listingType,
+  ]);
+  await getPool().query(
+    `INSERT INTO partner_offers (listing_id, partner_id, status, pickup_time, completed_at)
+     VALUES ($1, $2, $3, now(), CASE WHEN $3 = 'Completed' THEN now() END)`,
+    [listingId, partnerId, status],
+  );
+}
+
+/**
+ * US-44: a Zakat donation of `bags` bags of a consumer listing (as zakatRepository makes it: a Donation listing for
+ * the charity and a receipt). A Delivered one also has the charity's Completed pickup.
+ */
+export async function insertZakat(
+  listingId: string,
+  consumerId: string,
+  charityId: string,
+  bags: number,
+  amount: number,
+  status: 'Paid' | 'Delivered' | 'Refunded',
+): Promise<void> {
+  const donation = await getPool().query<{ id: string }>(
+    `INSERT INTO listings (vendor_id, listing_type, status, is_quick_post, food_type, food_category, photo_key,
+       bags_total, bags_available, original_value, price, pickup_start, pickup_end, storage, location, branch_id,
+       reserved_for_partner_id)
+     SELECT vendor_id, 'Donation', 'Active', is_quick_post, food_type, food_category, photo_key, $2, $2,
+       original_value, price, pickup_start, pickup_end, storage, location, branch_id, $3
+     FROM listings WHERE id = $1 RETURNING id`,
+    [listingId, bags, charityId],
+  );
+  const donationId = donation.rows[0]?.id;
+  await getPool().query(
+    `INSERT INTO zakat_donations (consumer_id, listing_id, donation_listing_id, charity_id, bags, amount,
+       receipt_number, status, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'ZK-TEST-' || substr(md5(random()::text), 1, 8), $7, now())`,
+    [consumerId, listingId, donationId, charityId, bags, amount, status],
+  );
+  if (status === 'Delivered') {
+    await getPool().query(
+      `INSERT INTO partner_offers (listing_id, partner_id, status, pickup_time, completed_at)
+       VALUES ($1, $2, 'Completed', now(), now())`,
+      [donationId, charityId],
+    );
+  }
+}
+
+/** FR-RTE-13: the landfill records of a listing. */
+export async function readLandfillRecords(listingId: string) {
+  const result = await getPool().query<{ bags: number }>(
+    'SELECT bags FROM landfill_records WHERE listing_id = $1',
+    [listingId],
+  );
+  return result.rows;
+}

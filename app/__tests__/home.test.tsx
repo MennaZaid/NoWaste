@@ -5,6 +5,9 @@ import { isServerHealthy } from '@/api/client';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getNotifications: jest.fn().mockResolvedValue({ kind: 'ok', notifications: [], unreadCount: 0 }),
+  readNotifications: jest.fn().mockResolvedValue(true),
+  getMyWaitlist: jest.fn().mockResolvedValue({ kind: 'ok', entries: [] }),
   isServerHealthy: jest.fn(),
   registerConsumer: jest.fn(),
 }));

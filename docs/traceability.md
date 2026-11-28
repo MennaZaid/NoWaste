@@ -368,3 +368,22 @@ on full listings, NFR-05c with an expiry), the moved pickup pin (FR-LST-01) and 
 | E-TGI-02 | US-43 | Server: declined card: 402 E-TGI-02 with the reason, bags stay, no receipt, no Donation. App: the reason is shown | AT-US43-05 | Built |
 | E-TGI-03, BR-11 | US-43 | Server: refunded in full after the window ends; nothing before; delivered not refunded; refund once | AT-US43-06 | Built (worker job) |
 | NFR-05a, NFR-06 | US-23, US-43 | App: no Zakat text says the food is safe; Arabic labels and right-to-left PDF | – | Built |
+
+## Sprint 3: US-29 Waitlist, US-35 Cancellation and refund (Menna, 2026-11-28, D-117 to D-120)
+
+| Requirement | Story | Tests (server/tests/waitlistCancel.test.ts, app/__tests__/waitlistCancel.test.tsx) | Acceptance tests | Status |
+| ----------- | ----- | --------------------------------------------------------------------------------- | ---------------- | ------ |
+| FR-RES-06 | US-29 | Server: join when sold out, second person is second; bags left refused; twice refused; leave moves others up; offered consumer accepts without a card and by card; decline passes on, nobody left gives the bag back; cancelled bag offered; push adapter called. App: join shows the number; no waitlist with bags left; leave; home banner opens the offer; reserve sends the entry; pass it on | AT-US29-01 to AT-US29-05 | Built, phone Not Tested |
+| FR-RES-05, BR-04 | US-29 | Server: expired hold with 30 min or more left is set aside for the first person (nobody else can take it); with less left it goes back to the listing | AT-US29-03 | Built |
+| BR-05 | US-29 | Server: not accepted in 10 min passes to the next person; accepting late refused; minutes from settings. App: late accept message | AT-US29-04 | Built |
+| FR-RES-12, BR-06 | US-35 | Server: card cancelled within 10 min refunded in full; after 10 min no refund; window from settings; code void; another consumer or twice refused. App: confirmation first; cancelled; refunded amount; not cancellable | AT-US35-01 to AT-US35-03 | Built, phone Not Tested |
+| FR-RES-13 | US-35 | Server: no-card cancelled before its slot is not a no-show; after its hold started it is. App: no-show message | AT-US35-04 | Built |
+| NFR-06, NFR-05a | US-29, US-35 | App: Arabic waitlist button; no text says the food is safe | – | Built |
+
+## Sprint 3: US-34 notifications in the app (Menna, 2026-11-28, D-121)
+
+| Requirement | Story | Tests (server/tests/notifications.test.ts, app/__tests__/notifications.test.tsx) | Acceptance tests | Status |
+| ----------- | ----- | --------------------------------------------------------------------------------- | ---------------- | ------ |
+| FR-RES-11 | US-34 | Server: no-card hold confirmed; card confirmed after approval; declined card gives none; released when the hold ran out; waitlist offer with the time; window open once; cancelled reservation gets none. App: texts in the app language, newest first; waitlist offer opens the offer; reservation notification opens the reservation | AT-US34-01 to AT-US34-04 | Built (in-app; push off, D-118), phone Not Tested |
+| IF-SW-06 | US-34 | Server: read clears the unread count; only one's own. App: bell with the count; opening marks read; empty list | AT-US34-01 | Built |
+| NFR-06, NFR-05a | US-34 | App: Arabic name and text; no text says the food is safe | – | Built |

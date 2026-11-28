@@ -20,6 +20,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Countdown, useNow } from '@/components/Countdown';
+import { CancelReservation } from '@/components/CancelReservation';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { localDigits } from '@/i18n/digits';
@@ -239,6 +240,8 @@ export default function ReservationScreen() {
                 }}
               />
             ) : null}
+            {/* US-35 (FR-RES-12, D-120): cancel before pickup. */}
+            <CancelReservation reservation={reservation} onCancelled={setReservation} />
           </>
         )}
       </View>

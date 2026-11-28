@@ -224,6 +224,34 @@ Source for the values: SRS 5.5 BR-01, read from database tables (docs/feedback-c
 | AT-US43-05 | Error | The consumer pays with the blocked card 40000002 | They pay | The reason is shown; no receipt; the bags are still on offer | E-TGI-02 |
 | AT-US43-06 | Error | A Paid donation the charity does not collect | The pickup window ends | The card gets the full amount back; the receipt shows Refunded | E-TGI-03, BR-11 |
 
+## US-29 Waitlist (Sprint 3, D-117 to D-119)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US29-01 | Normal | Every bag of an offer is reserved | A consumer opens it and taps Join the waitlist | They see their number on the waitlist | FR-RES-06 |
+| AT-US29-02 | Normal | A consumer is waiting | They tap Leave the waitlist | They leave; the next people move up | FR-RES-06, D-119 |
+| AT-US29-03 | Normal | Someone is waiting; at least 30 minutes of the pickup remain | A hold expires or a reservation is cancelled | The first person sees "A bag is waiting for you" with the time left; nobody else can reserve that bag | FR-RES-05, FR-RES-06, BR-04 |
+| AT-US29-04 | Normal | A bag is set aside for the consumer | They reserve it by card or without a card within 10 minutes | They get the reservation; after 10 minutes it goes to the next person instead | FR-RES-06, BR-05 |
+| AT-US29-05 | Alternative | A bag is set aside for the consumer | They tap "No thanks, pass it on" | The next person gets it at once, or it goes back on sale | FR-RES-06, D-119 |
+
+## US-35 Cancellation and refund (Sprint 3, D-120)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US35-01 | Normal | A card reservation made less than 10 minutes ago | The consumer cancels it and confirms | It is Cancelled and the full price goes back to the card | FR-RES-12, BR-06 |
+| AT-US35-02 | Normal | A card reservation made more than 10 minutes ago | The consumer cancels it | It is Cancelled with no refund, and the app says so | FR-RES-12, BR-06 |
+| AT-US35-03 | Normal | A no-card reservation whose slot has not started | The consumer cancels it | It is Cancelled; no no-show | FR-RES-12, FR-RES-13 |
+| AT-US35-04 | Error | A no-card reservation whose slot has started | The consumer cancels it | It is Cancelled and counts as a no-show | FR-RES-13 |
+
+## US-34 Notifications in the app (Sprint 3, D-121)
+
+| ID | Type | Given | When | Then | Requirements |
+| -- | ---- | ----- | ---- | ---- | ------------ |
+| AT-US34-01 | Normal | A consumer reserves a bag | They look at the home header | The bell shows 1; opening it shows "Your reservation … is confirmed" and the count goes away | FR-RES-11, IF-SW-06 |
+| AT-US34-02 | Normal | A no-card hold runs out | The consumer opens the notifications | "Your hold … ran out, so the bag was released" | FR-RES-11 |
+| AT-US34-03 | Normal | A freed bag is set aside for a waiting consumer | They open the notifications and tap it | It says until when, and opens the offer to reserve it | FR-RES-11, FR-RES-06 |
+| AT-US34-04 | Normal | The pickup (or the no-card slot) starts; the worker is running | The consumer opens the notifications | "Pickup has started: your bag … is ready to collect", once | FR-RES-11 |
+
 ## US-27 Card reservation (Sprint 2, D-99; test cards in docs/test-cards.md)
 
 | ID | Type | Given | When | Then | Requirements |

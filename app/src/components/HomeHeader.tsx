@@ -9,6 +9,7 @@ import { colors, spacing } from '@/theme';
 import { LanguageSwitch } from './LanguageSwitch';
 import { Logo } from './Logo';
 import { LogoutButton } from './LogoutButton';
+import { NotificationBell } from './NotificationBell';
 import { ProfileMenu } from './ProfileMenu';
 
 /** `profile`: the customer's profile icon and menu (D-94), beside Log out, so the switch stays at the end (D-42). */
@@ -21,6 +22,8 @@ export function HomeHeader({ profile = false }: { profile?: boolean }) {
         <Logo width={44} />
         <LogoutButton />
         {profile ? <ProfileMenu /> : null}
+        {/* US-34 (D-121): the customer's notifications. */}
+        {profile ? <NotificationBell /> : null}
       </View>
       <LanguageSwitch compact />
     </View>

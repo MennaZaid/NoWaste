@@ -211,7 +211,7 @@ export async function saveCheckIn(id: string, holdExpiresAt: Date, now: Date): P
  * changed only while it is still Held, so running this twice (or from the worker and an API read at once) releases
  * each hold once. Returns how many were released.
  */
-export async function releaseExpired(now: Date): Promise<number> {
+export async function releaseExpired(now: Date): Promise<string[]> {
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -240,7 +240,8 @@ export async function releaseExpired(now: Date): Promise<number> {
       );
     }
     await client.query('COMMIT');
-    return expired.rows.length;
+    // US-34 (D-121): the released reservations, so their consumers can be told.
+    return expired.rows.map((row) => row.id);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

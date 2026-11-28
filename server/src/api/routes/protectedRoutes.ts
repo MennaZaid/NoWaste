@@ -20,6 +20,7 @@ import {
   listingAutoOfferHandler,
 } from './partnerOffers.js';
 import { categoryHoursHandler } from './perishability.js';
+import { myNotificationsHandler, readNotificationsHandler } from './notifications.js';
 import { donateZakatHandler, myZakatHandler, zakatCharitiesHandler, zakatReceiptHandler } from './zakat.js';
 import { getRamadanHandler, setRamadanHandler } from './ramadan.js';
 import {
@@ -41,7 +42,12 @@ import {
   uploadPhotoHandler,
 } from './listings.js';
 import {
+  cancelReservationHandler,
   checkInHandler,
+  declineWaitlistHandler,
+  joinWaitlistHandler,
+  leaveWaitlistHandler,
+  myWaitlistHandler,
   getReservationHandler,
   myReservationsHandler,
   noShowStandingHandler,
@@ -78,6 +84,9 @@ const EVERYONE = ROLE_GROUPS;
 export const protectedRoutes: readonly ProtectedRoute[] = [
   { method: 'post', path: '/auth/logout', roles: EVERYONE, handler: logoutHandler },
   { method: 'get', path: '/users/me', roles: EVERYONE, handler: getMeHandler },
+  // US-34 (FR-RES-11, IF-SW-06, D-121): the notifications shown in the app.
+  { method: 'get', path: '/notifications', roles: EVERYONE, handler: myNotificationsHandler },
+  { method: 'post', path: '/notifications/read', roles: EVERYONE, handler: readNotificationsHandler },
   { method: 'patch', path: '/users/me', roles: EVERYONE, handler: patchMeHandler },
   // FR-ACC-06 (D-95): every logged-in user may change their password.
   { method: 'post', path: '/users/me/password', roles: EVERYONE, handler: changePasswordHandler },
@@ -232,6 +241,23 @@ export const protectedRoutes: readonly ProtectedRoute[] = [
   },
   { method: 'get', path: '/reservations/:id', roles: ['consumer'], handler: getReservationHandler },
   { method: 'post', path: '/reservations/:id/checkin', roles: ['consumer'], handler: checkInHandler },
+  // US-35 (FR-RES-12, FR-RES-13, D-120): cancel a reservation.
+  {
+    method: 'post',
+    path: '/reservations/:id/cancel',
+    roles: ['consumer'],
+    handler: cancelReservationHandler,
+  },
+  // US-29 (FR-RES-06, D-117 to D-119): the waitlist. Accepting an offer is POST /reservations with waitlistEntryId.
+  {
+    method: 'post',
+    path: '/listings/nearby/:id/waitlist',
+    roles: ['consumer'],
+    handler: joinWaitlistHandler,
+  },
+  { method: 'get', path: '/waitlist', roles: ['consumer'], handler: myWaitlistHandler },
+  { method: 'post', path: '/waitlist/:id/leave', roles: ['consumer'], handler: leaveWaitlistHandler },
+  { method: 'post', path: '/waitlist/:id/decline', roles: ['consumer'], handler: declineWaitlistHandler },
 ];
 
 export function mountProtectedRoutes(

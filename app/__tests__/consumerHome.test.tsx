@@ -12,6 +12,9 @@ import { formatDateTime } from '@/listings/formatDateTime';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getNotifications: jest.fn().mockResolvedValue({ kind: 'ok', notifications: [], unreadCount: 0 }),
+  readNotifications: jest.fn().mockResolvedValue(true),
+  getMyWaitlist: jest.fn().mockResolvedValue({ kind: 'ok', entries: [] }),
   isServerHealthy: jest.fn().mockResolvedValue(true),
   logout: jest.fn().mockResolvedValue(undefined),
   getMe: jest.fn(),
@@ -417,7 +420,9 @@ describe('FR-RES-01 D-87 D-88 the offer filters', () => {
     await setPickupBy(LATER);
 
     await waitFor(() => expect(lastQuery()).toEqual({ ...HERE, radiusKm: 10, pickupBy: LATER }));
-    expect(screen.getByTestId('offers-chip-pickup')).toHaveTextContent(`By ${formatDateTime(LATER, 'en')}`, { exact: false });
+    expect(screen.getByTestId('offers-chip-pickup')).toHaveTextContent(`By ${formatDateTime(LATER, 'en')}`, {
+      exact: false,
+    });
   });
 
   test('FR-RES-01 D-87 the filters work together and stay when the distance changes', async () => {
@@ -469,15 +474,18 @@ describe('FR-RES-01 D-87 D-88 the offer filters', () => {
     expect(await screen.findByTestId('offer-o1')).toBeOnTheScreen();
   });
 
-  test.each(['0', '-3', 'cheap'])('FR-RES-01 D-87 a maximum price of "%s" is marked and not sent', async (text) => {
-    await openHome();
-    const calls = mocked.nearby.mock.calls.length;
+  test.each(['0', '-3', 'cheap'])(
+    'FR-RES-01 D-87 a maximum price of "%s" is marked and not sent',
+    async (text) => {
+      await openHome();
+      const calls = mocked.nearby.mock.calls.length;
 
-    await setMaxPrice(text);
+      await setMaxPrice(text);
 
-    expect(await screen.findByText('Enter a price above 0.')).toBeOnTheScreen();
-    expect(mocked.nearby.mock.calls.length).toBe(calls);
-  });
+      expect(await screen.findByText('Enter a price above 0.')).toBeOnTheScreen();
+      expect(mocked.nearby.mock.calls.length).toBe(calls);
+    },
+  );
 
   test('FR-RES-01 D-87 a pickup time already passed is marked on Apply and not sent', async () => {
     await openHome();

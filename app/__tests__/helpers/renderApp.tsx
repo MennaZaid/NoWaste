@@ -24,6 +24,7 @@ import PartnerPickupScreen from '../../app/partner/pickups/[id]';
 import ZakatDonateScreen from '../../app/zakat/new/[id]';
 import ZakatReceiptScreen from '../../app/zakat/[id]';
 import ZakatReceiptsScreen from '../../app/zakat/index';
+import NotificationsScreen from '../../app/notifications';
 
 export function renderApp(initialUrl = '/') {
   return renderRouter(
@@ -52,6 +53,7 @@ export function renderApp(initialUrl = '/') {
       'zakat/new/[id]': ZakatDonateScreen,
       'zakat/[id]': ZakatReceiptScreen,
       'zakat/index': ZakatReceiptsScreen,
+      notifications: NotificationsScreen,
     },
     { initialUrl },
   );

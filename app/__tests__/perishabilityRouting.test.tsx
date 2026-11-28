@@ -23,6 +23,9 @@ import { LANGUAGE_STORAGE_KEY } from '@/i18n/languageStorage';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getNotifications: jest.fn().mockResolvedValue({ kind: 'ok', notifications: [], unreadCount: 0 }),
+  readNotifications: jest.fn().mockResolvedValue(true),
+  getMyWaitlist: jest.fn().mockResolvedValue({ kind: 'ok', entries: [] }),
   getAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: false }),
   setAutoCharity: jest.fn().mockResolvedValue({ kind: 'ok', optIn: true }),
   getListingAutoOffer: jest.fn().mockResolvedValue({ kind: 'ok', offer: null }),

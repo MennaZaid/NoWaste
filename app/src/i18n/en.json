@@ -767,5 +767,49 @@
     "share": "Share as PDF",
     "shareFailed": "Could not make the PDF. Try again.",
     "failed": "Could not load this. Check your connection and try again."
+  },
+  "waitlist": {
+    "join": "Join the waitlist",
+    "joining": "Joining…",
+    "soldOutHint": "Every bag is reserved. Join the waitlist and we will set a freed bag aside for you.",
+    "position": "You are number {{position}} on the waitlist.",
+    "leave": "Leave the waitlist",
+    "left": "You left the waitlist.",
+    "offeredTitle": "A bag is set aside for you",
+    "offeredUntil": "Reserve it by card or without a card before {{time}}, or it goes to the next person.",
+    "decline": "No thanks, pass it on",
+    "declined": "The bag was passed to the next person.",
+    "expired": "The 10 minutes to accept have passed, so the bag went to the next person.",
+    "bannerTitle": "A bag is waiting for you",
+    "bannerOpen": "Open the offer",
+    "bannerLeft": "Time left to accept: {{time}}",
+    "failed": "Something went wrong. Try again."
+  },
+  "cancel": {
+    "button": "Cancel reservation",
+    "confirmCard": "Cancel this reservation? You get the full amount back only if you cancel shortly after paying (within the refund time).",
+    "confirmNoCard": "Cancel this reservation? If your pickup slot has already started, it counts as a no-show.",
+    "yes": "Yes, cancel it",
+    "no": "Keep it",
+    "cancelling": "Cancelling…",
+    "refunded": "Cancelled. {{amount}} will go back to your card.",
+    "notRefunded": "Cancelled. It was more than the refund time after paying, so there is no refund.",
+    "cancelled": "Cancelled.",
+    "noShow": "Cancelled after your slot started, so it counts as a no-show.",
+    "notCancellable": "This reservation can no longer be cancelled.",
+    "refundFailed": "The bank could not refund right now, so nothing was cancelled. Try again."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bell": "Notifications",
+    "bellUnread": "Notifications, {{count}} new",
+    "empty": "No notifications yet.",
+    "failed": "Could not load the notifications. Check your connection and try again.",
+    "kinds": {
+      "reservation_confirmed": "Your reservation of {{name}} at {{shop}} is confirmed.",
+      "reservation_released": "Your hold on {{name}} at {{shop}} ran out, so the bag was released.",
+      "waitlist_offer": "A bag of {{name}} at {{shop}} is set aside for you until {{time}}. Reserve it before then.",
+      "window_open": "Pickup has started: your bag of {{name}} at {{shop}} is ready to collect."
+    }
   }
 }

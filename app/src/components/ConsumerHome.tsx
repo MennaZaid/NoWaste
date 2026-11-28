@@ -29,6 +29,7 @@ import { Button } from './Button';
 import { DateTimeField } from './DateTimeField';
 import { DistanceSlider } from './DistanceSlider';
 import { FilterSheet } from './FilterSheet';
+import { WaitlistBanner } from './WaitlistBanner';
 import { ListingPhoto } from './ListingPhoto';
 import { OffersMap, type Coordinates, type MapPlace } from './MapView';
 import { Notice } from './Notice';
@@ -362,6 +363,10 @@ export function ConsumerHome() {
         setAreaHeight(event.nativeEvent.layout.height);
       }}
     >
+      {/* US-29 (D-118): a bag set aside for this consumer, shown on top of the map. */}
+      <View style={styles.waitlistBanner} pointerEvents="box-none">
+        <WaitlistBanner />
+      </View>
       {center !== null ? (
         <OffersMap
           center={center}
@@ -393,7 +398,10 @@ export function ConsumerHome() {
             <Chip
               testID="offers-chip-distance"
               text={formatKm(distance)}
-              accessibilityLabel={t('offers.pair', { first: t('offers.distanceLabel'), second: formatKm(distance) })}
+              accessibilityLabel={t('offers.pair', {
+                first: t('offers.distanceLabel'),
+                second: formatKm(distance),
+              })}
               active={false}
               onPress={() => {
                 openSheet('distance');
@@ -403,7 +411,10 @@ export function ConsumerHome() {
           <Chip
             testID="offers-chip-price"
             text={filters.maxPrice === null ? t('offers.filters.priceChip') : priceValue}
-            accessibilityLabel={t('offers.pair', { first: t('offers.filters.maxPriceLabel'), second: priceValue })}
+            accessibilityLabel={t('offers.pair', {
+              first: t('offers.filters.maxPriceLabel'),
+              second: priceValue,
+            })}
             active={filters.maxPrice !== null}
             onPress={() => {
               openSheet('price');
@@ -419,7 +430,10 @@ export function ConsumerHome() {
           <Chip
             testID="offers-chip-pickup"
             text={filters.pickupBy === null ? t('offers.filters.pickupChip') : pickupValue}
-            accessibilityLabel={t('offers.pair', { first: t('offers.filters.pickupByLabel'), second: pickupValue })}
+            accessibilityLabel={t('offers.pair', {
+              first: t('offers.filters.pickupByLabel'),
+              second: pickupValue,
+            })}
             active={filters.pickupBy !== null}
             onPress={() => {
               openSheet('pickup');
@@ -620,6 +634,13 @@ export function ConsumerHome() {
 }
 
 const styles = StyleSheet.create({
+  waitlistBanner: {
+    position: 'absolute',
+    top: 8,
+    start: 8,
+    end: 8,
+    zIndex: 10,
+  },
   area: {
     flex: 1,
     backgroundColor: colors.accent,

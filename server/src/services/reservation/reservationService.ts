@@ -1,8 +1,9 @@
 // C-09 Reservation Service, IReservation (SDD 3.2.1, 5.2): no-card reservation and its hold (FR-RES-03), "I'm on my
 // way" (FR-RES-04, E-RES-05), release when the hold expires (FR-RES-05), never more reservations than bags
 // (FR-RES-07, E-RES-02). Decisions D-89 to D-93. The minutes come from the settings rows BR-02, BR-03 and BR-09,
-// never from constants in code. Card reservations (US-27), the waitlist (US-29) and push notifications (US-34) come
-// later; until the waitlist exists a released bag goes back to the listing.
+// never from constants in code. US-29 (D-117): a freed bag is offered to the waitlist (waitlistService.runWaitlist);
+// a waitlist offer is accepted with POST /reservations and waitlistEntryId. US-35 (D-120): cancel, with the BR-06
+// refund and the FR-RES-13 no-show. Push notifications (US-34) come later.
 import { randomInt } from 'node:crypto';
 import { DatabaseError } from 'pg';
 import { clock } from '../../domain/clock.js';
@@ -19,7 +20,13 @@ import {
   type SlotRule,
 } from '../../domain/reservation.js';
 import { withTransaction } from '../../data/db.js';
-import { chargeCard, paymentTimeoutMs } from '../payment/paymentService.js';
+import { chargeCard, paymentTimeoutMs, refundCard } from '../payment/paymentService.js';
+import { runWaitlist } from '../waitlist/waitlistService.js';
+import {
+  notifyReservationConfirmed,
+  notifyReservationsReleased,
+} from '../notification/notificationService.js';
+import { cancelReservation, claimOffer, findCancelFacts } from '../../data/waitlistRepository.js';
 import {
   confirmCardReservation,
   dropPendingReservation,
@@ -117,7 +124,26 @@ export async function releaseExpiredHolds(): Promise<number> {
   // D-102: listings whose pickup has ended are Closed (the worker runs this every minute).
   await closeEndedListings(now);
   await dropStalePendingPayments(new Date(now.getTime() - 2 * (await paymentTimeoutMs())));
-  return releaseExpired(now);
+  const released = await releaseExpired(now);
+  // US-34 (FR-RES-11, D-121): each consumer is told their reservation was released.
+  await notifyReservationsReleased(released);
+  // US-29 (FR-RES-05, FR-RES-06): freed bags go to the people waiting; offers not accepted in time pass on.
+  await runWaitlist(now);
+  return released.length;
+}
+
+/** US-29: claims the waitlist offer inside the reservation transaction, or refuses (409 offer_expired, 404). */
+async function claimWaitlistBag(
+  client: Parameters<typeof claimOffer>[0],
+  entryId: string | null,
+  consumerId: string,
+  listingId: string,
+  now: Date,
+): Promise<void> {
+  if (entryId === null) return;
+  const outcome = await claimOffer(client, entryId, consumerId, listingId, now);
+  if (outcome === 'notFound') throw new SrsError(404, { error: 'not_found' });
+  if (outcome === 'expired') throw new SrsError(409, { error: 'offer_expired' });
 }
 
 async function viewOf(id: string, consumerId: string): Promise<ReservationView> {
@@ -143,8 +169,13 @@ export async function reserve(
   consumerId: string,
   input: Record<string, unknown>,
 ): Promise<{ created: boolean; reservation: ReservationView }> {
-  const { listingId, method, slotStart, paymentToken, idempotencyKey } = input;
+  const { listingId, method, slotStart, paymentToken, idempotencyKey, waitlistEntryId } = input;
   const fields: string[] = [];
+  // US-29: accepting a waitlist offer sends its entry id.
+  if (waitlistEntryId !== undefined && (typeof waitlistEntryId !== 'string' || !UUID.test(waitlistEntryId))) {
+    fields.push('waitlistEntryId');
+  }
+  const entryId = typeof waitlistEntryId === 'string' ? waitlistEntryId : null;
   if (typeof listingId !== 'string' || !UUID.test(listingId)) fields.push('listingId');
   if (method !== 'no-card' && method !== 'card') fields.push('method');
   const slot = typeof slotStart === 'string' ? new Date(slotStart) : null;
@@ -168,7 +199,9 @@ export async function reserve(
   }
   // D-93: a hold that has ended gives its bag back before anyone reserves.
   await releaseExpiredHolds();
-  if (method === 'card') return reserveByCard(consumerId, listingId as string, paymentToken as string, key);
+  if (method === 'card') {
+    return reserveByCard(consumerId, listingId as string, paymentToken as string, key, entryId);
+  }
   const now = clock.now();
   const [hold, codes, slots] = [await holdRule(), await codeRule(), await slotRule()];
 
@@ -185,7 +218,9 @@ export async function reserve(
       if (await hasHeldReservation(client, offer.id, consumerId)) {
         throw new SrsError(409, { error: 'already_reserved' });
       }
-      if (offer.bagsAvailable <= 0) throw new SrsError(409, { error: 'E-RES-02' });
+      await claimWaitlistBag(client, entryId, consumerId, offer.id, now);
+      const bagsAvailable = offer.bagsAvailable + (entryId === null ? 0 : 1);
+      if (bagsAvailable <= 0) throw new SrsError(409, { error: 'E-RES-02' });
       await takeBag(client, offer.id);
       const reservationId = await insertHeldReservation(client, {
         listingId: offer.id,
@@ -211,6 +246,8 @@ export async function reserve(
     }
     throw error;
   }
+  // US-34 (FR-RES-11, D-121): the no-card hold is confirmed.
+  await notifyReservationConfirmed(id);
   return { created: true, reservation: await viewOf(id, consumerId) };
 }
 
@@ -236,6 +273,7 @@ async function reserveByCard(
   listingId: string,
   paymentToken: string,
   key: string | null,
+  entryId: string | null = null,
 ): Promise<{ created: boolean; reservation: ReservationView }> {
   const now = clock.now();
   let pending: { id: string; price: number };
@@ -243,7 +281,9 @@ async function reserveByCard(
     pending = await withTransaction(async (client) => {
       const offer = await lockOffer(client, listingId, now);
       if (offer === undefined) throw new SrsError(404, { error: 'not_found' });
-      if (offer.bagsAvailable <= 0) throw new SrsError(409, { error: 'E-RES-02' });
+      await claimWaitlistBag(client, entryId, consumerId, offer.id, now);
+      if (offer.bagsAvailable + (entryId === null ? 0 : 1) <= 0)
+        throw new SrsError(409, { error: 'E-RES-02' });
       await takeBag(client, offer.id);
       const id = await insertPendingCardReservation(client, {
         listingId: offer.id,
@@ -276,6 +316,8 @@ async function reserveByCard(
     });
     await insertCode(client, pending.id);
   });
+  // US-34 (FR-RES-11, D-121): confirmed once the bank approved.
+  await notifyReservationConfirmed(pending.id);
   return { created: true, reservation: await viewOf(pending.id, consumerId) };
 }
 
@@ -336,4 +378,52 @@ export async function myReservations(
   }
   await releaseExpiredHolds();
   return { reservations: (await listReservations(consumerId, scope, clock.now())).map(toView) };
+}
+
+const refundRule = () =>
+  numbers<{ full_refund_within_minutes: number }>('BR-06', ['full_refund_within_minutes']);
+
+/**
+ * POST /reservations/:id/cancel (FR-RES-12, FR-RES-13, US-35, D-120): before the pickup ends, a Held or Confirmed
+ * reservation is Cancelled, its code made void and its bag freed for the waitlist. A card payment is refunded in full
+ * only within BR-06 minutes of reserving; a no-card reservation cancelled after its hold started (its slot start)
+ * counts as a no-show. 409 not_cancellable otherwise; 502 refund_failed when the bank did not refund (nothing changes).
+ */
+export async function cancel(
+  consumerId: string,
+  id: string,
+): Promise<{ reservation: ReservationView; refund: { refunded: boolean; amount: number }; noShow: boolean }> {
+  if (!UUID.test(id)) throw new SrsError(404, { error: 'not_found' });
+  await releaseExpiredHolds();
+  const facts = await findCancelFacts(id, consumerId);
+  if (facts === undefined) throw new SrsError(404, { error: 'not_found' });
+  const now = clock.now();
+  if (
+    (facts.status !== 'Held' && facts.status !== 'Confirmed') ||
+    facts.pickupEnd.getTime() <= now.getTime()
+  ) {
+    throw new SrsError(409, { error: 'not_cancellable', status: facts.status });
+  }
+  const windowMs = (await refundRule()).full_refund_within_minutes * 60_000;
+  const refundable =
+    facts.method === 'card' &&
+    facts.paymentReference !== null &&
+    now.getTime() - facts.createdAt.getTime() <= windowMs;
+  const amount = refundable ? (facts.paymentAmount ?? 0) : 0;
+  if (refundable && !(await refundCard(facts.paymentReference as string, amount))) {
+    throw new SrsError(502, { error: 'refund_failed' });
+  }
+  const noShow = facts.method === 'no-card' && slotStarted(facts.slotStart, now);
+  const done = await cancelReservation({
+    id,
+    listingId: facts.listingId,
+    consumerId,
+    method: facts.method,
+    refunded: refundable,
+    noShow,
+    now,
+  });
+  if (!done) throw new SrsError(409, { error: 'not_cancellable', status: facts.status });
+  await runWaitlist(now);
+  return { reservation: await viewOf(id, consumerId), refund: { refunded: refundable, amount }, noShow };
 }

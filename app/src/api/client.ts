@@ -1064,20 +1064,27 @@ export async function reserveWithoutCard(
   listingId: string,
   slotStart: string,
   idempotencyKey: string,
+  /** US-29: accepting a waitlist offer. */
+  waitlistEntryId?: string,
 ): Promise<
   Protected<
     | { kind: 'ok'; reservation: Reservation }
     | { kind: 'soldOut' }
     | { kind: 'alreadyReserved' }
+    | { kind: 'offerExpired' }
     | { kind: 'notFound' }
   >
 > {
   const result = await protectedCall(
     '/reservations',
-    { method: 'POST', body: JSON.stringify({ listingId, method: 'no-card', slotStart, idempotencyKey }) },
+    {
+      method: 'POST',
+      body: JSON.stringify({ listingId, method: 'no-card', slotStart, idempotencyKey, waitlistEntryId }),
+    },
     token,
   );
   if (result.kind !== 'response') return result;
+  if (result.status === 409 && result.data?.error === 'offer_expired') return { kind: 'offerExpired' };
   if (result.status === 409 && result.data?.error === 'E-RES-02') return { kind: 'soldOut' };
   if (result.status === 409 && result.data?.error === 'already_reserved') return { kind: 'alreadyReserved' };
   if (result.status === 404) return { kind: 'notFound' };
@@ -1200,20 +1207,27 @@ export async function reserveByCard(
   listingId: string,
   paymentToken: string,
   idempotencyKey: string,
+  /** US-29: accepting a waitlist offer. */
+  waitlistEntryId?: string,
 ): Promise<
   Protected<
     | { kind: 'ok'; reservation: Reservation }
     | { kind: 'paymentFailed'; reason: PaymentFailure }
     | { kind: 'soldOut' }
+    | { kind: 'offerExpired' }
     | { kind: 'notFound' }
   >
 > {
   const result = await protectedCall(
     '/reservations',
-    { method: 'POST', body: JSON.stringify({ listingId, method: 'card', paymentToken, idempotencyKey }) },
+    {
+      method: 'POST',
+      body: JSON.stringify({ listingId, method: 'card', paymentToken, idempotencyKey, waitlistEntryId }),
+    },
     token,
   );
   if (result.kind !== 'response') return result;
+  if (result.status === 409 && result.data?.error === 'offer_expired') return { kind: 'offerExpired' };
   if (result.status === 402 && result.data?.error === 'E-RES-01') {
     return { kind: 'paymentFailed', reason: result.data.reason as PaymentFailure };
   }
@@ -1657,4 +1671,138 @@ export async function getZakatReceipt(
   return result.status === 200 && result.data !== null
     ? { kind: 'ok', receipt: result.data as unknown as ZakatReceipt }
     : { kind: 'unexpected' };
+}
+
+// US-29 Waitlist (FR-RES-06, D-117 to D-119) and US-35 Cancellation (FR-RES-12, FR-RES-13, D-120).
+
+export interface WaitlistEntry {
+  id: string;
+  listingId: string;
+  status: 'Waiting' | 'Offered' | 'Accepted' | 'Expired' | 'Declined' | 'Left';
+  /** 1 for the first person waiting; null when not Waiting. */
+  position: number | null;
+  offerExpiresAt: string | null;
+  createdAt: string;
+  listing: {
+    nameAr: string | null;
+    nameEn: string | null;
+    sourceLanguage: Language | null;
+    price: number;
+    pickupStart: string;
+    pickupEnd: string;
+    shopName: string;
+  };
+}
+
+type EntryAnswer = Protected<
+  { kind: 'ok'; entry: WaitlistEntry } | { kind: 'refused'; error: string } | { kind: 'notFound' }
+>;
+
+async function entryCall(path: string, token: string, okStatus: number): Promise<EntryAnswer> {
+  const result = await protectedCall(path, { method: 'POST' }, token);
+  if (result.kind !== 'response') return result;
+  if (result.status === okStatus && result.data !== null) {
+    return { kind: 'ok', entry: result.data as unknown as WaitlistEntry };
+  }
+  if (result.status === 409 && typeof result.data?.error === 'string')
+    return { kind: 'refused', error: result.data.error };
+  if (result.status === 404) return { kind: 'notFound' };
+  return { kind: 'unexpected' };
+}
+
+/** POST /listings/nearby/:id/waitlist: refused with bags_available or already_waiting. */
+export function joinWaitlist(token: string, listingId: string): Promise<EntryAnswer> {
+  return entryCall(`/listings/nearby/${encodeURIComponent(listingId)}/waitlist`, token, 201);
+}
+
+/** POST /waitlist/:id/leave */
+export function leaveWaitlist(token: string, entryId: string): Promise<EntryAnswer> {
+  return entryCall(`/waitlist/${encodeURIComponent(entryId)}/leave`, token, 200);
+}
+
+/** POST /waitlist/:id/decline: the bag passes to the next person. */
+export function declineWaitlistOffer(token: string, entryId: string): Promise<EntryAnswer> {
+  return entryCall(`/waitlist/${encodeURIComponent(entryId)}/decline`, token, 200);
+}
+
+/** GET /waitlist: the consumer's places and offers. */
+export async function getMyWaitlist(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; entries: WaitlistEntry[] }>> {
+  const result = await protectedCall('/waitlist', {}, token);
+  if (result.kind !== 'response') return result;
+  const entries = result.data?.entries;
+  return result.status === 200 && Array.isArray(entries)
+    ? { kind: 'ok', entries: entries as unknown as WaitlistEntry[] }
+    : { kind: 'unexpected' };
+}
+
+export interface CancelResult {
+  reservation: Reservation;
+  refund: { refunded: boolean; amount: number };
+  noShow: boolean;
+}
+
+/** POST /reservations/:id/cancel (FR-RES-12): refused when it can no longer be cancelled. */
+export async function cancelReservation(
+  token: string,
+  id: string,
+): Promise<
+  Protected<
+    | { kind: 'ok'; result: CancelResult }
+    | { kind: 'notCancellable' }
+    | { kind: 'refundFailed' }
+    | { kind: 'notFound' }
+  >
+> {
+  const result = await protectedCall(
+    `/reservations/${encodeURIComponent(id)}/cancel`,
+    { method: 'POST' },
+    token,
+  );
+  if (result.kind !== 'response') return result;
+  if (result.status === 409) return { kind: 'notCancellable' };
+  if (result.status === 502) return { kind: 'refundFailed' };
+  if (result.status === 404) return { kind: 'notFound' };
+  return result.status === 200 && result.data !== null
+    ? { kind: 'ok', result: result.data as unknown as CancelResult }
+    : { kind: 'unexpected' };
+}
+
+// US-34 notifications shown in the app (FR-RES-11, IF-SW-06, D-121).
+
+export interface AppNotification {
+  id: string;
+  kind: 'reservation_confirmed' | 'reservation_released' | 'waitlist_offer' | 'window_open';
+  /** Ids, names and times only; the text is written on the phone in its language. */
+  data: {
+    reservationId?: string;
+    listingId?: string;
+    entryId?: string;
+    shopName?: string;
+    nameAr?: string;
+    nameEn?: string;
+    offerExpiresAt?: string;
+  };
+  createdAt: string;
+  read: boolean;
+}
+
+/** GET /notifications: the latest notifications, newest first, and how many are unread. */
+export async function getNotifications(
+  token: string,
+): Promise<Protected<{ kind: 'ok'; notifications: AppNotification[]; unreadCount: number }>> {
+  const result = await protectedCall('/notifications', {}, token);
+  if (result.kind !== 'response') return result;
+  const notifications = result.data?.notifications;
+  const unread = result.data?.unreadCount;
+  return result.status === 200 && Array.isArray(notifications) && typeof unread === 'number'
+    ? { kind: 'ok', notifications: notifications as unknown as AppNotification[], unreadCount: unread }
+    : { kind: 'unexpected' };
+}
+
+/** POST /notifications/read */
+export async function readNotifications(token: string): Promise<boolean> {
+  const result = await protectedCall('/notifications/read', { method: 'POST' }, token);
+  return result.kind === 'response' && result.status === 200;
 }

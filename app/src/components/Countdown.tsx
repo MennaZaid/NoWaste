@@ -27,7 +27,7 @@ interface CountdownProps {
   onEnd?: () => void;
   variant?: 'heading' | 'body';
   /** D-97: the text around the time; "Time left to collect" by default, "Starts in" before the slot. */
-  labelKey?: 'reservation.timeLeft' | 'reservation.startsIn';
+  labelKey?: 'reservation.timeLeft' | 'reservation.startsIn' | 'waitlist.bannerLeft';
   /** Red under 5 minutes (only for the time left to collect). */
   warn?: boolean;
   testID?: string;

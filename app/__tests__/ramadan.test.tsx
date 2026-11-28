@@ -19,6 +19,9 @@ import { RAMADAN_MODE_KEY } from '@/components/ConsumerHome';
 import { renderApp } from './helpers/renderApp';
 
 jest.mock('@/api/client', () => ({
+  getNotifications: jest.fn().mockResolvedValue({ kind: 'ok', notifications: [], unreadCount: 0 }),
+  readNotifications: jest.fn().mockResolvedValue(true),
+  getMyWaitlist: jest.fn().mockResolvedValue({ kind: 'ok', entries: [] }),
   isServerHealthy: jest.fn().mockResolvedValue(true),
   logout: jest.fn().mockResolvedValue(undefined),
   getMe: jest.fn(),

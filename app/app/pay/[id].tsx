@@ -19,7 +19,7 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { listingText } from '@/listings/listingText';
 import { colors, spacing } from '@/theme';
 
-type Problem = PaymentFailure | 'soldOut' | 'other';
+type Problem = PaymentFailure | 'soldOut' | 'offerExpired' | 'other';
 
 /** NFR-15: one key per payment attempt, so a retry after a dropped connection is not charged twice. */
 function newIdempotencyKey(): string {
@@ -30,7 +30,8 @@ export default function PayScreen() {
   const { t } = useTranslation();
   const { direction, language } = useLanguage();
   const { token, signOut } = useAuth();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // US-29: `entry` is the waitlist entry when the consumer accepts a bag set aside for them.
+  const { id, entry } = useLocalSearchParams<{ id: string; entry?: string }>();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [number, setNumber] = useState('');
   const [expiry, setExpiry] = useState('');
@@ -75,7 +76,10 @@ export default function PayScreen() {
       else setProblem('other');
       return;
     }
-    const result = await reserveByCard(token, offer.id, tokenResult.token, idempotencyKey.current);
+    const result =
+      typeof entry === 'string'
+        ? await reserveByCard(token, offer.id, tokenResult.token, idempotencyKey.current, entry)
+        : await reserveByCard(token, offer.id, tokenResult.token, idempotencyKey.current);
     setBusy(false);
     if (result.kind === 'ok') {
       router.replace({ pathname: '/reservations/[id]', params: { id: result.reservation.id } });
@@ -85,6 +89,7 @@ export default function PayScreen() {
     idempotencyKey.current = newIdempotencyKey();
     if (result.kind === 'paymentFailed') setProblem(result.reason);
     else if (result.kind === 'soldOut' || result.kind === 'notFound') setProblem('soldOut');
+    else if (result.kind === 'offerExpired') setProblem('offerExpired');
     else if (result.kind === 'unauthorized' || result.kind === 'suspended') void signOut();
     else setProblem('other');
   }
@@ -144,7 +149,13 @@ export default function PayScreen() {
           <Notice
             testID="card-problem"
             tone="error"
-            message={problem === 'soldOut' ? t('offers.soldOut') : t(`payment.failed.${problem}`)}
+            message={
+              problem === 'soldOut'
+                ? t('offers.soldOut')
+                : problem === 'offerExpired'
+                  ? t('waitlist.expired')
+                  : t(`payment.failed.${problem}`)
+            }
           />
         ) : null}
         {offer !== null ? (
